@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!--
+      SMS evidence acquisition (increment 4). Permissions are only requested
+      after the user reviews the consent screen explaining the on-device use
+      case. We never delete or modify the user SMS database; we only read.
+    -->
+    <!--
+      Optional historical backfill + read access.
+      Hard-restricted on Android 13+ (API 33+): only default SMS apps can
+      hold it. We still declare it so the system can present the grant dialog
+      and the user can grant it via Settings → SMS access if the OEM allows.
+    -->
+    <uses-permission android:name="android.permission.READ_SMS" />
+    <!--
+      Broadcast hook for new incoming messages. The receiver does the minimum
+      in onReceive (persist raw evidence) and enqueues durable processing.
+    -->
+    <uses-permission android:name="android.permission.RECEIVE_SMS" />
+
+    <!--
+      Optional LLM enrichment (Chat Completions API). Only used when the user
+      configures and enables AI interpretation in Settings.
+    -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <application
+        android:name=".FinTrackApplication"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:label="FinTrack"
+        android:theme="@style/Theme.FinTrack">
+        <activity android:name=".MainActivity" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!--
+          SMS receiver. Protected by BROADCAST_SMS so only the system delivers
+          to it. The receiver does the minimum in onReceive (persist raw
+          evidence to Room) and enqueues a WorkManager job.
+        -->
+        <receiver
+            android:name=".sms.SmsReceiver"
+            android:exported="true"
+            android:permission="android.permission.BROADCAST_SMS">
+            <intent-filter android:priority="100">
+                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

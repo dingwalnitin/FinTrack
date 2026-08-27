@@ -1,0 +1,37 @@
+# --- Gradle / Android ---
+.gradle/
+build/
+app/build/
+local.properties
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+*.keystore
+*.jks
+!debug.keystore
+
+# --- Kotlin ---
+.kotlin/
+
+# --- IDE / OS ---
+.idea/
+*.iml
+.vscode/
+.DS_Store
+Thumbs.db
+
+# --- Python / Notebooks ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.env
+.ipynb_checkpoints/
+
+# --- Logs / temp ---
+*.log
+tmp.txt
+count

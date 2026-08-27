@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- All user-visible strings live here (localization-ready). No secrets or
+     sensitive content may ever be added to resources. -->
+<resources>
+    <string name="app_name">FinTrack</string>
+
+    <!-- Navigation destinations -->
+    <string name="nav_home">Home</string>
+    <string name="nav_transactions">Transactions</string>
+    <string name="nav_accounts">Accounts</string>
+    <string name="nav_budgets">Budgets</string>
+    <string name="nav_insights">Insights</string>
+    <string name="nav_review">Review</string>
+    <string name="nav_settings">Settings</string>
+
+    <!-- Common UI states -->
+    <string name="state_empty">Nothing here yet</string>
+    <string name="state_loading">Loading…</string>
+    <string name="state_error_title">Something went wrong</string>
+    <string name="state_processing">Processing</string>
+    <string name="state_review">Review needed</string>
+    <string name="action_retry">Retry</string>
+    <string name="action_dismiss">Dismiss</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_review">Review</string>
+
+    <!-- Money / rows -->
+    <string name="amount_debit_prefix">−</string>
+    <string name="amount_credit_prefix">+</string>
+    <string name="debit_label">Debit</string>
+    <string name="credit_label">Credit</string>
+
+    <!-- Settings sections -->
+    <string name="settings_accounts_sources">Accounts &amp; sources</string>
+    <string name="settings_categorization">Categorization</string>
+    <string name="settings_llm_controls">AI interpretation controls</string>
+    <string name="settings_data_lifecycle">Data lifecycle</string>
+    <string name="settings_feature_flags">Feature configuration</string>
+    <string name="settings_export_data">Export data</string>
+    <string name="settings_export_warning">Exports contain your financial history and stay on this device.</string>
+
+    <!-- SMS evidence (increment 4) -->
+    <string name="sms_consent_title">SMS evidence</string>
+    <string name="sms_consent_explain">FinTrack uses SMS messages only as raw evidence for your personal money tracking. We never modify or delete the messages on your phone. Everything stays on this device.</string>
+</resources>
