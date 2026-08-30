@@ -21,7 +21,12 @@ class SmsBackfillWorker(
         val orchestrator = BackfillOrchestrator(app.smsSource, app.smsRepository)
         return when (orchestrator.run()) {
             BackfillOrchestrator.Outcome.Complete,
-            BackfillOrchestrator.Outcome.Paused,
+            BackfillOrchestrator.Outcome.Paused -> {
+                // Backfilled raw evidence is otherwise never interpreted —
+                // only the live SmsReceiver path enqueues processing.
+                SmsIngestionScheduler.enqueueSmsProcessing(applicationContext)
+                Result.success()
+            }
             BackfillOrchestrator.Outcome.Revoked -> Result.success()
             is BackfillOrchestrator.Outcome.Failed ->
                 if (runAttemptCount < 3) Result.retry() else Result.failure()

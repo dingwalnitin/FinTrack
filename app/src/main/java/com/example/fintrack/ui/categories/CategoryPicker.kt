@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -64,7 +65,12 @@ fun CategoryPicker(
             }
         }
 
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        // Bounded height: a reusable picker can't rely on its host providing
+        // a constrained height, and an unbounded LazyColumn crashes at runtime.
+        LazyColumn(
+            modifier = Modifier.heightIn(max = 320.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
             items(visible, key = { it.id.value }) { category ->
                 val hasChildren = allCategories.any { it.parentId == category.id }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -1,6 +1,8 @@
 package com.example.fintrack.ui.search
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -63,7 +65,10 @@ fun SearchScreen(viewModel: SearchViewModel) {
             )
         }
         item {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 FilterChip(
                     selected = state.filters.accountId == null,
                     onClick = { viewModel.updateFilters { it.copy(accountId = null) } },
@@ -79,7 +84,10 @@ fun SearchScreen(viewModel: SearchViewModel) {
             }
         }
         item {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 FilterChip(
                     selected = state.filters.kind == null,
                     onClick = { viewModel.updateFilters { it.copy(kind = null) } },
@@ -95,7 +103,10 @@ fun SearchScreen(viewModel: SearchViewModel) {
             }
         }
         item {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 FilterChip(
                     selected = state.filters.sortField == SortField.OCCURRED_AT &&
                         state.filters.sortDirection == SortDirection.DESC,

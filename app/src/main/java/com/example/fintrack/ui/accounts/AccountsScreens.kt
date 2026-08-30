@@ -1,5 +1,6 @@
 package com.example.fintrack.ui.accounts
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -7,6 +8,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
@@ -40,7 +43,11 @@ fun AccountsScreen(
     val state by viewModel.state.collectAsState()
     when (val s = state) {
         is UiState.Loading -> Text("Loading accounts…", Modifier.padding(16.dp))
-        is UiState.Empty -> Column(Modifier.padding(16.dp)) {
+        is UiState.Empty -> Column(
+            Modifier
+                .padding(16.dp)
+                .verticalScroll(rememberScrollState()),
+        ) {
             Text("No accounts yet")
             AddAccountForm(viewModel)
         }
@@ -132,7 +139,10 @@ private fun AddAccountForm(viewModel: AccountsViewModel) {
             OutlinedTextField(last4, { if (it.length <= 4 && it.all(Char::isDigit)) last4 = it }, label = { Text("Last 4 digits (optional)") }, modifier = Modifier.fillMaxWidth())
             OutlinedTextField(currency, { currency = it }, label = { Text("Currency (INR/USD)") }, modifier = Modifier.fillMaxWidth())
             OutlinedTextField(opening, { opening = it }, label = { Text("Opening balance (major units, optional)") }, modifier = Modifier.fillMaxWidth())
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 AccountType.entries.forEach { t ->
                     OutlinedButton(onClick = { type = t }, enabled = type != t) { Text(t.name.removePrefix("OTHER_")) }
                 }
@@ -170,7 +180,12 @@ fun ReconcileScreen(viewModel: ReconcileViewModel, accountId: String, currencyCo
         state = viewModel.reconcile(accountId)
     }
 
-    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(
+        Modifier
+            .padding(16.dp)
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
         Text("Reconcile", style = MaterialTheme.typography.titleLarge)
         when (val s = state) {
             is ReconcileViewModel.State.Loading -> Text("Loading…")
