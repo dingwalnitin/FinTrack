@@ -36,11 +36,18 @@ class ContentResolverSmsSource(
             require(limit > 0) { "limit must be positive" }
             if (!hasPermission()) return@withContext emptyList()
 
+            // No cursor yet (first page of a fresh backfill) must omit the
+            // WHERE clause entirely — _ID is always positive, so a sentinel
+            // like "_ID < -1" would match nothing and silently short-circuit
+            // the whole backfill as "complete" without reading any history.
+            val selection = if (afterProviderId != null) SELECT_AFTER else null
+            val selectionArgs = if (afterProviderId != null) arrayOf(afterProviderId.toString()) else null
+
             val cursor = resolver.query(
                 Telephony.Sms.CONTENT_URI,
                 PROJECTION,
-                SELECT_AFTER,
-                arrayOf(afterProviderId?.toString() ?: "-1"),
+                selection,
+                selectionArgs,
                 "${Telephony.Sms._ID} DESC LIMIT $limit",
             ) ?: return@withContext emptyList()
 

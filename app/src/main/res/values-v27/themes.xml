@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- windowLightNavigationBar requires API 27+; minSdk is 26, so it is kept in
+     this qualified override rather than the base theme. -->
 <resources>
-    <!-- Dark-first native theme so the window background/status bar match the
-         Compose dark palette before FinTrackTheme composes (avoids a white flash). -->
     <style name="Theme.FinTrack" parent="android:Theme.Material.NoActionBar">
         <item name="android:windowBackground">@color/app_background</item>
         <item name="android:statusBarColor">@color/app_background</item>
         <item name="android:navigationBarColor">@color/app_background</item>
         <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
     </style>
 </resources>

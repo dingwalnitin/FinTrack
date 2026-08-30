@@ -1,17 +1,29 @@
 package com.example.fintrack.ui.accounts
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountBalance
+import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.filled.CreditCard
+import androidx.compose.material.icons.filled.Payments
+import androidx.compose.material.icons.filled.Receipt
+import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -23,10 +35,21 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.fintrack.domain.model.AccountType
+import com.example.fintrack.ui.common.EmptyState
+import com.example.fintrack.ui.common.ErrorState
+import com.example.fintrack.ui.common.FinTrackCard
+import com.example.fintrack.ui.common.IconBadge
+import com.example.fintrack.ui.common.LoadingSkeleton
+import com.example.fintrack.ui.common.SectionHeader
 import com.example.fintrack.ui.common.UiState
+import com.example.fintrack.ui.theme.Palette
+import com.example.fintrack.ui.theme.categoryColor
 import kotlinx.coroutines.launch
 
 /**
@@ -42,34 +65,54 @@ fun AccountsScreen(
 ) {
     val state by viewModel.state.collectAsState()
     when (val s = state) {
-        is UiState.Loading -> Text("Loading accounts…", Modifier.padding(16.dp))
+        is UiState.Loading -> LoadingSkeleton()
         is UiState.Empty -> Column(
             Modifier
+                .fillMaxWidth()
                 .padding(16.dp)
                 .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text("No accounts yet")
+            Text("Accounts", style = MaterialTheme.typography.headlineSmall)
+            EmptyState("No accounts yet — add your first one below")
             AddAccountForm(viewModel)
         }
-        is UiState.Error -> Column(Modifier.padding(16.dp)) {
-            Text("Error: ${s.message}", color = MaterialTheme.colorScheme.error)
-        }
-        is UiState.Content -> LazyColumn(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            item { Text("Accounts", style = MaterialTheme.typography.titleLarge) }
-            items(s.data.active) { acct ->
-                AccountCard(acct, onArchive = { viewModel.archive(acct.id) })
-                EditBalanceCard(acct, onEditBalance = { amount -> onEditBalance(acct.id, amount) })
+        is UiState.Error -> ErrorState(message = s.message)
+        is UiState.Content -> LazyColumn(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            contentPadding = PaddingValues(top = 16.dp, bottom = 96.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            item {
+                Text("Accounts", style = MaterialTheme.typography.headlineSmall)
+                Text(
+                    "${s.data.active.size} active",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            items(s.data.active, key = { it.id }) { acct ->
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AccountCard(acct, onArchive = { viewModel.archive(acct.id) }, onClick = { onReconcile(acct.id) })
+                    EditBalanceCard(acct, onEditBalance = { amount -> onEditBalance(acct.id, amount) })
+                }
             }
             if (s.data.archived.isNotEmpty()) {
-                item { Text("Archived (history kept)", style = MaterialTheme.typography.titleMedium) }
-                items(s.data.archived) { acct ->
-                    Card {
-                        Column(Modifier.padding(12.dp)) {
-                            Text(acct.displayName)
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                OutlinedButton(onClick = { viewModel.restore(acct.id) }) { Text("Restore") }
-                                OutlinedButton(onClick = { onReconcile(acct.id) }) { Text("Reconcile") }
+                item {
+                    SectionHeader("Archived (history kept)", modifier = Modifier.padding(top = 8.dp))
+                }
+                items(s.data.archived, key = { it.id }) { acct ->
+                    FinTrackCard {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            IconBadge(icon = accountTypeIcon(acct.type), containerColor = Palette.SurfaceHigh, tint = Palette.TextSecondary)
+                            Column(Modifier.weight(1f)) {
+                                Text(acct.displayName, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text("Archived", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
+                            IconButton(onClick = { viewModel.restore(acct.id) }) {
+                                Icon(Icons.Filled.Restore, contentDescription = "Restore")
+                            }
+                            OutlinedButton(onClick = { onReconcile(acct.id) }) { Text("Reconcile") }
                         }
                     }
                 }
@@ -80,14 +123,34 @@ fun AccountsScreen(
     }
 }
 
+private fun accountTypeIcon(type: AccountType): ImageVector = when (type) {
+    AccountType.BANK -> Icons.Filled.AccountBalance
+    AccountType.CREDIT_CARD -> Icons.Filled.CreditCard
+    AccountType.CASH -> Icons.Filled.Payments
+    AccountType.OTHER_LIABILITY -> Icons.Filled.Receipt
+}
+
 @Composable
-private fun AccountCard(acct: AccountUi, onArchive: () -> Unit) {
-    Card {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(acct.displayName, style = MaterialTheme.typography.titleMedium)
-            Text("${acct.type.name} · ${acct.currencyCode}")
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = onArchive) { Text("Archive") }
+private fun AccountCard(acct: AccountUi, onArchive: () -> Unit, onClick: () -> Unit) {
+    val tint = categoryColor(acct.institution ?: acct.displayName)
+    FinTrackCard(modifier = Modifier.clickable(onClick = onClick)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            IconBadge(icon = accountTypeIcon(acct.type), containerColor = tint.copy(alpha = 0.18f), tint = tint, size = 48.dp)
+            Column(Modifier.weight(1f)) {
+                Text(
+                    acct.displayName,
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    "${acct.type.name.replace('_', ' ')} · ${acct.currencyCode}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            IconButton(onClick = onArchive) {
+                Icon(Icons.Filled.Archive, contentDescription = "Archive account")
             }
         }
     }
@@ -101,19 +164,22 @@ private fun AccountCard(acct: AccountUi, onArchive: () -> Unit) {
 @Composable
 private fun EditBalanceCard(acct: AccountUi, onEditBalance: (String) -> Unit) {
     var balance by remember { mutableStateOf("") }
-    Card {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Set current balance", style = MaterialTheme.typography.titleSmall)
+    FinTrackCard(containerColor = Palette.BackgroundAlt) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             OutlinedTextField(
                 balance,
                 { balance = it },
-                label = { Text("Current balance (${acct.currencyCode})") },
-                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Set current balance (${acct.currencyCode})") },
+                singleLine = true,
+                modifier = Modifier.weight(1f),
             )
             Button(
                 onClick = { onEditBalance(balance.trim()); balance = "" },
                 enabled = balance.trim().toDoubleOrNull() != null,
-            ) { Text("Save balance") }
+            ) { Text("Save") }
         }
     }
 }
@@ -131,38 +197,54 @@ private fun AddAccountForm(viewModel: AccountsViewModel) {
     var type by remember { mutableStateOf(AccountType.BANK) }
     var opening by remember { mutableStateOf("") }
 
-    Card {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Add account", style = MaterialTheme.typography.titleMedium)
-            OutlinedTextField(nickname, { nickname = it }, label = { Text("Nickname") }, modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(institution, { institution = it }, label = { Text("Bank / institution (optional)") }, modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(last4, { if (it.length <= 4 && it.all(Char::isDigit)) last4 = it }, label = { Text("Last 4 digits (optional)") }, modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(currency, { currency = it }, label = { Text("Currency (INR/USD)") }, modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(opening, { opening = it }, label = { Text("Opening balance (major units, optional)") }, modifier = Modifier.fillMaxWidth())
-            Row(
-                modifier = Modifier.horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                AccountType.entries.forEach { t ->
-                    OutlinedButton(onClick = { type = t }, enabled = type != t) { Text(t.name.removePrefix("OTHER_")) }
-                }
+    FinTrackCard {
+        Text("Add account", style = MaterialTheme.typography.titleMedium)
+        Spacer(Modifier.height(12.dp))
+        Row(
+            modifier = Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            AccountType.entries.forEach { t ->
+                IconBadge(
+                    icon = accountTypeIcon(t),
+                    containerColor = if (type == t) Palette.Violet else Palette.SurfaceHigh,
+                    tint = if (type == t) androidx.compose.ui.graphics.Color.White else Palette.TextSecondary,
+                    size = 44.dp,
+                    modifier = Modifier.clickable(onClick = { type = t }),
+                )
             }
-            Button(
-                onClick = {
-                    val openingMinor = opening.toDoubleOrNull()
-                        ?.let { Math.round(it * 100) } ?: 0L
-                    viewModel.addAccount(
-                        nickname = nickname.trim(), type = type,
-                        currencyCode = currency.trim().uppercase().ifBlank { "INR" },
-                        last4 = last4.ifBlank { null },
-                        institution = institution.trim().ifBlank { null },
-                        openingBalanceMinor = openingMinor,
-                    )
-                    nickname = ""; institution = ""; last4 = ""; opening = ""
-                },
-                enabled = nickname.isNotBlank(),
-            ) { Text("Save account") }
         }
+        Spacer(Modifier.height(4.dp))
+        Text(
+            type.name.replace('_', ' '),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(12.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            OutlinedTextField(nickname, { nickname = it }, label = { Text("Nickname") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(institution, { institution = it }, label = { Text("Bank / institution (optional)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(last4, { if (it.length <= 4 && it.all(Char::isDigit)) last4 = it }, label = { Text("Last 4 digits (optional)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(currency, { currency = it }, label = { Text("Currency (INR/USD)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(opening, { opening = it }, label = { Text("Opening balance (major units, optional)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        }
+        Spacer(Modifier.height(16.dp))
+        Button(
+            onClick = {
+                val openingMinor = opening.toDoubleOrNull()
+                    ?.let { Math.round(it * 100) } ?: 0L
+                viewModel.addAccount(
+                    nickname = nickname.trim(), type = type,
+                    currencyCode = currency.trim().uppercase().ifBlank { "INR" },
+                    last4 = last4.ifBlank { null },
+                    institution = institution.trim().ifBlank { null },
+                    openingBalanceMinor = openingMinor,
+                )
+                nickname = ""; institution = ""; last4 = ""; opening = ""
+            },
+            enabled = nickname.isNotBlank(),
+            modifier = Modifier.fillMaxWidth(),
+        ) { Text("Save account") }
     }
 }
 
@@ -184,39 +266,63 @@ fun ReconcileScreen(viewModel: ReconcileViewModel, accountId: String, currencyCo
         Modifier
             .padding(16.dp)
             .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("Reconcile", style = MaterialTheme.typography.titleLarge)
+        Text("Reconcile", style = MaterialTheme.typography.headlineSmall)
         when (val s = state) {
-            is ReconcileViewModel.State.Loading -> Text("Loading…")
-            is ReconcileViewModel.State.NoData -> Text("No balances or postings yet for this account.")
+            is ReconcileViewModel.State.Loading -> Text("Loading…", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            is ReconcileViewModel.State.NoData -> Text("No balances or postings yet for this account.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             is ReconcileViewModel.State.Error -> Text("Error: ${s.message}", color = MaterialTheme.colorScheme.error)
             is ReconcileViewModel.State.Ready -> {
-                Text(s.result.accountLabel)
-                Text("Actual (latest snapshot): ${format(s.result.actualMinor)} $currencyCode")
-                Text("Ledger-derived: ${format(s.result.derivedMinor)} $currencyCode")
-                val diffLabel = if (s.result.differenceMinor >= 0) "+" else "−"
-                Text(
-                    "Difference: $diffLabel${format(kotlin.math.abs(s.result.differenceMinor))} $currencyCode",
-                    color = if (s.result.reconciled) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.error,
-                )
-                if (!s.result.reconciled) Text("Review required: balances differ.", style = MaterialTheme.typography.labelLarge)
+                FinTrackCard {
+                    Text(s.result.accountLabel, style = MaterialTheme.typography.titleMedium)
+                    Spacer(Modifier.height(8.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Actual (latest snapshot)", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("${format(s.result.actualMinor)} $currencyCode")
+                    }
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Ledger-derived", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("${format(s.result.derivedMinor)} $currencyCode")
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    val diffLabel = if (s.result.differenceMinor >= 0) "+" else "−"
+                    Text(
+                        "Difference: $diffLabel${format(kotlin.math.abs(s.result.differenceMinor))} $currencyCode",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = if (s.result.reconciled) Palette.Income else Palette.Danger,
+                    )
+                    if (!s.result.reconciled) {
+                        Text("Review required: balances differ.", style = MaterialTheme.typography.labelLarge, color = Palette.Warn)
+                    }
+                }
             }
         }
-        OutlinedTextField(actualInput, { actualInput = it }, label = { Text("Actual balance ($currencyCode)") })
-        Button(
-            onClick = {
-                val minor = actualInput.toDoubleOrNull()?.let { Math.round(it * 100) } ?: return@Button
-                scope.launch {
-                    viewModel.recordActualBalance(accountId, currencyCode, minor) {
-                        state = ReconcileViewModel.State.Loading
+        FinTrackCard {
+            Text("Record actual balance", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                actualInput,
+                { actualInput = it },
+                label = { Text("Actual balance ($currencyCode)") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(12.dp))
+            Button(
+                onClick = {
+                    val minor = actualInput.toDoubleOrNull()?.let { Math.round(it * 100) } ?: return@Button
+                    scope.launch {
+                        viewModel.recordActualBalance(accountId, currencyCode, minor) {
+                            state = ReconcileViewModel.State.Loading
+                        }
+                        state = viewModel.reconcile(accountId)
                     }
-                    state = viewModel.reconcile(accountId)
-                }
-            },
-            enabled = actualInput.toDoubleOrNull() != null,
-        ) { Text("Record actual balance") }
+                },
+                enabled = actualInput.toDoubleOrNull() != null,
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("Record actual balance") }
+        }
     }
 }
 

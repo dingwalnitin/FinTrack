@@ -5,20 +5,25 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import com.example.fintrack.R
+import com.example.fintrack.ui.common.GradientFab
 import com.example.fintrack.ui.settings.SettingsScreen
 import com.example.fintrack.ui.settings.SettingsUiModel
+import com.example.fintrack.ui.theme.Palette
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -44,7 +49,7 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun FinTrackAppShell(
     navController: NavHostController = rememberNavController(),
-    transactionsRoute: @Composable () -> Unit,
+    transactionsRoute: @Composable (onOpenTransaction: (String) -> Unit) -> Unit,
     accountsViewModel: com.example.fintrack.ui.accounts.AccountsViewModel,
     reconcileViewModel: ReconcileViewModel,
     smsConsentState: com.example.fintrack.ui.sms.SmsConsentState,
@@ -65,13 +70,24 @@ fun FinTrackAppShell(
     diagnosticsViewModel: com.example.fintrack.application.diagnostics.DiagnosticsViewModel? = null,
     llmConfigStore: com.example.fintrack.llm.LlmConfigStore? = null,
     llmProcessingViewModel: com.example.fintrack.application.enrichment.LlmProcessingViewModel? = null,
+    manualEntryViewModel: com.example.fintrack.application.transactions.ManualEntryViewModel? = null,
+    transactionDetailViewModel: com.example.fintrack.application.transactions.TransactionDetailViewModel? = null,
 ) {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
+    val showAddFab = currentRoute == Routes.HOME || currentRoute == Routes.TRANSACTIONS
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        floatingActionButton = {
+            if (showAddFab && manualEntryViewModel != null) {
+                GradientFab(onClick = { navController.navigate(Routes.MANUAL_ENTRY) })
+            }
+        },
         bottomBar = {
             NavigationBar(
+                containerColor = Palette.Surface,
+                tonalElevation = 0.dp,
                 modifier = Modifier.semantics {
                     contentDescription = "Main navigation"
                 }
@@ -88,7 +104,20 @@ fun FinTrackAppShell(
                                 restoreState = true
                             }
                         },
-                        icon = {},
+                        alwaysShowLabel = selected,
+                        icon = {
+                            Icon(
+                                dest.icon,
+                                contentDescription = null,
+                            )
+                        },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = Color.White,
+                            indicatorColor = Palette.Violet,
+                            selectedTextColor = Palette.Violet,
+                            unselectedIconColor = Palette.TextMuted,
+                            unselectedTextColor = Palette.TextMuted,
+                        ),
                         label = {
                             Text(
                                 label,
@@ -112,15 +141,43 @@ fun FinTrackAppShell(
             composable(Routes.HOME) {
                 val vm = homeViewModel
                 if (vm != null) {
-                    com.example.fintrack.ui.home.HomeScreen(vm)
+                    com.example.fintrack.ui.home.HomeScreen(
+                        viewModel = vm,
+                        onOpenTransactions = {
+                            navController.navigate(Routes.TRANSACTIONS) {
+                                popUpTo(Routes.HOME) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        },
+                        onOpenReview = {
+                            navController.navigate(Routes.REVIEW) {
+                                popUpTo(Routes.HOME) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        },
+                        onOpenBudgets = {
+                            navController.navigate(Routes.BUDGETS) {
+                                popUpTo(Routes.HOME) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        },
+                        onOpenTransaction = { id -> navController.navigate(Routes.transactionDetail(id)) },
+                        onAddTransaction = { navController.navigate(Routes.MANUAL_ENTRY) },
+                    )
                 } else {
                     PlaceholderScreen(stringResource(R.string.nav_home))
                 }
             }
-            composable(Routes.TRANSACTIONS) { transactionsRoute() }
+            composable(Routes.TRANSACTIONS) {
+                transactionsRoute { id -> navController.navigate(Routes.transactionDetail(id)) }
+            }
             composable(Routes.ACCOUNTS) {
                 AccountsScreen(
                     viewModel = accountsViewModel,
+                    onReconcile = { id -> navController.navigate(Routes.accountDetail(id)) },
                     onEditBalance = { id, amount ->
                         accountsViewModel.recordActualBalance(id, "INR", amount)
                     },
@@ -169,7 +226,7 @@ fun FinTrackAppShell(
                 if (rvm != null) {
                     com.example.fintrack.ui.review.ReviewQueueScreen(
                         viewModel = rvm,
-                        onOpenTransaction = { /* detail route handled by transactions tab */ },
+                        onOpenTransaction = { id -> navController.navigate(Routes.transactionDetail(id)) },
                     )
                 } else {
                     PlaceholderScreen(stringResource(R.string.nav_review))
@@ -216,6 +273,32 @@ fun FinTrackAppShell(
                     com.example.fintrack.ui.diagnostics.DiagnosticsScreen(dvm)
                 } else {
                     PlaceholderScreen("Developer diagnostics")
+                }
+            }
+            composable(Routes.MANUAL_ENTRY) {
+                val vm = manualEntryViewModel
+                if (vm != null) {
+                    com.example.fintrack.ui.transactions.ManualEntryScreen(
+                        viewModel = vm,
+                        onSaved = { navController.popBackStack() },
+                    )
+                } else {
+                    PlaceholderScreen("New transaction")
+                }
+            }
+            composable(
+                route = Routes.TRANSACTION_DETAIL,
+                arguments = listOf(navArgument("transactionId") { type = NavType.StringType }),
+            ) { entry ->
+                val transactionId = entry.arguments?.getString("transactionId").orEmpty()
+                val vm = transactionDetailViewModel
+                if (vm != null) {
+                    com.example.fintrack.ui.transactions.TransactionDetailScreen(
+                        transactionId = transactionId,
+                        viewModel = vm,
+                    )
+                } else {
+                    PlaceholderScreen(stringResource(R.string.nav_transactions))
                 }
             }
         }

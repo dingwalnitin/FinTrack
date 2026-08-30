@@ -1,6 +1,15 @@
 package com.example.fintrack.ui.navigation
 
 import androidx.annotation.StringRes
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.FactCheck
+import androidx.compose.material.icons.automirrored.filled.ReceiptLong
+import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Insights
+import androidx.compose.material.icons.filled.PieChart
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.ui.graphics.vector.ImageVector
 import com.example.fintrack.R
 
 /**
@@ -45,14 +54,14 @@ object Routes {
     const val DEEP_LINK_HOST = "app"
 
     val topLevel: List<TopLevelDestination> = listOf(
-        TopLevelDestination(HOME, R.string.nav_home),
-        TopLevelDestination(TRANSACTIONS, R.string.nav_transactions),
-        TopLevelDestination(ACCOUNTS, R.string.nav_accounts),
-        TopLevelDestination(BUDGETS, R.string.nav_budgets),
-        TopLevelDestination(INSIGHTS, R.string.nav_insights),
-        TopLevelDestination(REVIEW, R.string.nav_review),
-        TopLevelDestination(SETTINGS, R.string.nav_settings),
+        TopLevelDestination(HOME, R.string.nav_home, Icons.Filled.Home),
+        TopLevelDestination(TRANSACTIONS, R.string.nav_transactions, Icons.AutoMirrored.Filled.ReceiptLong),
+        TopLevelDestination(ACCOUNTS, R.string.nav_accounts, Icons.Filled.AccountBalanceWallet),
+        TopLevelDestination(BUDGETS, R.string.nav_budgets, Icons.Filled.PieChart),
+        TopLevelDestination(INSIGHTS, R.string.nav_insights, Icons.Filled.Insights),
+        TopLevelDestination(REVIEW, R.string.nav_review, Icons.AutoMirrored.Filled.FactCheck),
+        TopLevelDestination(SETTINGS, R.string.nav_settings, Icons.Filled.Settings),
     )
 }
 
-data class TopLevelDestination(val route: String, @StringRes val labelRes: Int)
+data class TopLevelDestination(val route: String, @StringRes val labelRes: Int, val icon: ImageVector)

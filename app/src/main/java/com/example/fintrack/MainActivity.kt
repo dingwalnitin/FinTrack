@@ -86,13 +86,23 @@ class MainActivity : ComponentActivity() {
             service = app.llmProcessingService,
         )
 
+        // P11 #3/#6: manual entry + transaction detail (previously unreachable — now wired into the shell).
+        val manualEntryVM = com.example.fintrack.application.transactions.ManualEntryViewModel(
+            service = app.manualEntryService,
+        )
+        val transactionDetailVM = com.example.fintrack.application.transactions.TransactionDetailViewModel(
+            dao = app.database.financeDaoV3(),
+            daoV4 = app.database.financeDaoV4(),
+            daoV2 = app.database.financeDaoV2(),
+        )
+
         setContent {
             FinTrackTheme {
                 Surface {
                     val state by viewModel.state.collectAsState()
                     val smsState by smsViewModel.state.collectAsState()
                     FinTrackAppShell(
-                        transactionsRoute = { TransactionsRoute(state) },
+                        transactionsRoute = { onOpenTransaction -> TransactionsRoute(state, onOpenTransaction) },
                         accountsViewModel = accountsViewModel,
                         reconcileViewModel = reconcileViewModel,
                         smsConsentState = smsState,
@@ -113,6 +123,8 @@ class MainActivity : ComponentActivity() {
                         diagnosticsViewModel = diagnosticsVM,
                         llmConfigStore = llmConfigStore,
                         llmProcessingViewModel = llmProcessingVM,
+                        manualEntryViewModel = manualEntryVM,
+                        transactionDetailViewModel = transactionDetailVM,
                     )
                 }
             }

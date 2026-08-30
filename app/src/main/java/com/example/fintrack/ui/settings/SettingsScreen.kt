@@ -3,19 +3,28 @@ package com.example.fintrack.ui.settings
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.Sms
+import androidx.compose.material.icons.filled.Category
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.Button
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -25,6 +34,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -34,9 +44,13 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.example.fintrack.BuildConfig
 import com.example.fintrack.R
 import com.example.fintrack.application.enrichment.LlmProcessingViewModel
 import com.example.fintrack.llm.LlmConfig
+import com.example.fintrack.ui.common.FinTrackCard
+import com.example.fintrack.ui.common.IconBadge
+import com.example.fintrack.ui.theme.Palette
 
 /**
  * Settings shell. Sections only — no API keys, tokens or secrets are ever
@@ -63,60 +77,103 @@ fun SettingsScreen(
 ) {
     var ui by remember { mutableStateOf(model) }
 
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .padding(16.dp)
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+    LazyColumn(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        contentPadding = PaddingValues(top = 16.dp, bottom = 96.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text(stringResource(R.string.nav_settings), style = MaterialTheme.typography.titleLarge)
-        SectionHeader(stringResource(R.string.settings_accounts_sources))
-        SettingsLink(stringResource(R.string.nav_accounts))
-        SettingsLink("Scan SMS messages", onClick = onNavigateToSmsConsent)
-        SectionHeader(stringResource(R.string.settings_categorization))
-        ToggleRow(
-            label = stringResource(R.string.settings_categorization),
-            checked = ui.autoCategorizationEnabled,
-        ) { ui = ui.copy(autoCategorizationEnabled = it); onChanged(ui) }
-        SectionHeader(stringResource(R.string.settings_llm_controls))
-        ToggleRow(
-            label = stringResource(R.string.settings_llm_controls),
-            checked = ui.aiInterpretationEnabled,
-        ) { ui = ui.copy(aiInterpretationEnabled = it); onChanged(ui) }
-        Text(
-            "AI interpretation calls an OpenAI-compatible Chat Completions endpoint. " +
-                "Raw SMS stays on this device; only normalized text is sent.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        LlmConfigFields(
-            config = ui.llmConfig,
-            onConfigChanged = { cfg -> ui = ui.copy(llmConfig = cfg); onChanged(ui) },
-        )
-        llmProcessingViewModel?.let { vm ->
-            val progress by vm.progress.collectAsState()
-            val context = LocalContext.current
-            LlmProcessingBar(
-                progress = progress,
-                onStart = { vm.startScan(context) },
-                onStop = vm::stopScan,
-                onRequestSmsPermission = onRequestSmsPermission,
-                onNavigateToSmsConsent = onNavigateToSmsConsent,
-            )
+        item { Text(stringResource(R.string.nav_settings), style = MaterialTheme.typography.headlineSmall) }
+
+        item {
+            FinTrackCard {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    IconBadge(icon = Icons.Filled.AutoAwesome, containerColor = Palette.Violet)
+                    Column {
+                        Text("FinTrack", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            "v${BuildConfig.VERSION_NAME} · everything stays on this device",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
         }
-        SectionHeader(stringResource(R.string.settings_data_lifecycle))
-        ToggleRow(
-            label = stringResource(R.string.settings_export_data),
-            checked = ui.exportIncludeRawEvidence,
-        ) { ui = ui.copy(exportIncludeRawEvidence = it); onChanged(ui) }
-        Text(
-            stringResource(R.string.settings_export_warning),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        SectionHeader("Developer")
-        SettingsLink("Developer diagnostics", onClick = onNavigateToDiagnostics)
+
+        item {
+            FinTrackCard {
+                CommonSectionHeader(stringResource(R.string.settings_accounts_sources))
+                SettingsLink(stringResource(R.string.nav_accounts), icon = Icons.Filled.AccountBalanceWallet)
+                SettingsLink("Scan SMS messages", icon = Icons.Filled.Sms, onClick = onNavigateToSmsConsent)
+            }
+        }
+
+        item {
+            FinTrackCard {
+                CommonSectionHeader(stringResource(R.string.settings_categorization))
+                ToggleRow(
+                    label = stringResource(R.string.settings_categorization),
+                    icon = Icons.Filled.Category,
+                    checked = ui.autoCategorizationEnabled,
+                ) { ui = ui.copy(autoCategorizationEnabled = it); onChanged(ui) }
+            }
+        }
+
+        item {
+            FinTrackCard {
+                CommonSectionHeader(stringResource(R.string.settings_llm_controls))
+                ToggleRow(
+                    label = stringResource(R.string.settings_llm_controls),
+                    icon = Icons.Filled.AutoAwesome,
+                    checked = ui.aiInterpretationEnabled,
+                ) { ui = ui.copy(aiInterpretationEnabled = it); onChanged(ui) }
+                Text(
+                    "AI interpretation calls an OpenAI-compatible Chat Completions endpoint. " +
+                        "Raw SMS stays on this device; only normalized text is sent.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
+                )
+                LlmConfigFields(
+                    config = ui.llmConfig,
+                    onConfigChanged = { cfg -> ui = ui.copy(llmConfig = cfg); onChanged(ui) },
+                )
+                llmProcessingViewModel?.let { vm ->
+                    val progress by vm.progress.collectAsState()
+                    val context = LocalContext.current
+                    LlmProcessingBar(
+                        progress = progress,
+                        onStart = { vm.startScan(context) },
+                        onStop = vm::stopScan,
+                        onRequestSmsPermission = onRequestSmsPermission,
+                        onNavigateToSmsConsent = onNavigateToSmsConsent,
+                    )
+                }
+            }
+        }
+
+        item {
+            FinTrackCard {
+                CommonSectionHeader(stringResource(R.string.settings_data_lifecycle))
+                ToggleRow(
+                    label = stringResource(R.string.settings_export_data),
+                    icon = Icons.Filled.CloudDone,
+                    checked = ui.exportIncludeRawEvidence,
+                ) { ui = ui.copy(exportIncludeRawEvidence = it); onChanged(ui) }
+                Text(
+                    stringResource(R.string.settings_export_warning),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
+        item {
+            FinTrackCard {
+                CommonSectionHeader("Developer")
+                SettingsLink("Developer diagnostics", icon = Icons.Filled.BugReport, onClick = onNavigateToDiagnostics)
+            }
+        }
     }
 }
 
@@ -136,7 +193,7 @@ private fun LlmProcessingBar(
     var smsDecision by remember { mutableStateOf<String?>(null) }
 
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        SectionHeader("LLM SMS processing")
+        CommonSectionHeader("LLM SMS processing")
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             if (progress.running) {
                 OutlinedButton(onClick = onStop) { Text("Stop") }
@@ -267,32 +324,35 @@ private fun LlmConfigFields(
 }
 
 @Composable
-private fun SectionHeader(text: String) {
+private fun CommonSectionHeader(text: String) {
     Text(
         text,
         style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(top = 12.dp),
+        color = Palette.Violet,
+        modifier = Modifier.padding(bottom = 8.dp),
     )
-    HorizontalDivider()
 }
 
 /** Row with 48dp+ touch target and switch semantics for screen readers. */
 @Composable
-private fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+private fun ToggleRow(label: String, checked: Boolean, icon: ImageVector? = null, onChange: (Boolean) -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
             .heightIn(min = 48.dp)
             .clickable(role = Role.Switch) { onChange(!checked) }
             .padding(vertical = 8.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, Modifier.weight(1f))
+        if (icon != null) {
+            IconBadge(icon = icon, containerColor = Palette.SurfaceHigh, tint = Palette.TextSecondary, size = 36.dp)
+        }
+        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
         Switch(
             checked = checked,
             onCheckedChange = onChange,
+            colors = SwitchDefaults.colors(checkedTrackColor = Palette.Violet),
             modifier = Modifier.semantics {
                 role = Role.Switch
                 contentDescription = "$label: ${if (checked) "on" else "off"}"
@@ -302,14 +362,20 @@ private fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Un
 }
 
 @Composable
-private fun SettingsLink(label: String, onClick: () -> Unit = {}) {
+private fun SettingsLink(label: String, icon: ImageVector? = null, onClick: () -> Unit = {}) {
     Row(
         Modifier
             .fillMaxWidth()
             .heightIn(min = 48.dp)
             .clickable(onClickLabel = label) { onClick() }
             .padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label)
+        if (icon != null) {
+            IconBadge(icon = icon, containerColor = Palette.SurfaceHigh, tint = Palette.TextSecondary, size = 36.dp)
+        }
+        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+        Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = Palette.TextMuted)
     }
 }

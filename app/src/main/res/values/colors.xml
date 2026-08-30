@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Native (pre-Compose) theme colors only — the in-app palette lives in
+     ui/theme/Color.kt. Kept in sync manually since XML can't reference Kotlin. -->
+<resources>
+    <color name="app_background">#0D0C1A</color>
+</resources>

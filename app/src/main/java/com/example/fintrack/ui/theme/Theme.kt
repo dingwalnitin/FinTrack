@@ -1,8 +1,10 @@
 package com.example.fintrack.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
@@ -10,8 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -56,13 +57,30 @@ private val LightColors: ColorScheme = lightColorScheme(
     surfaceVariant = Color(0xFFE7E2EC),
 )
 
+/** Dark, premium fintech palette matching the reference design mockups. */
 private val DarkColors: ColorScheme = darkColorScheme(
-    primary = Color(0xFF9ECAFF),
-    onPrimary = Color(0xFF003258),
-    secondary = Color(0xFF80CBC4),
-    error = Color(0xFFF2B8B5),
-    surface = Color(0xFF1C1B1F),
-    surfaceVariant = Color(0xFF49454F),
+    primary = Palette.Violet,
+    onPrimary = Color.White,
+    primaryContainer = Palette.SurfaceHigh,
+    onPrimaryContainer = Palette.TextPrimary,
+    secondary = Palette.Blue,
+    onSecondary = Color.White,
+    tertiary = Palette.Pink,
+    onTertiary = Color.White,
+    error = Palette.Danger,
+    onError = Color.White,
+    background = Palette.Background,
+    onBackground = Palette.TextPrimary,
+    surface = Palette.Surface,
+    onSurface = Palette.TextPrimary,
+    surfaceVariant = Palette.SurfaceElevated,
+    onSurfaceVariant = Palette.TextSecondary,
+    surfaceContainer = Palette.Surface,
+    surfaceContainerLow = Palette.BackgroundAlt,
+    surfaceContainerHigh = Palette.SurfaceElevated,
+    surfaceContainerHighest = Palette.SurfaceHigh,
+    outline = Palette.Outline,
+    outlineVariant = Palette.Outline,
 )
 
 private val LightMoney = MoneySemanticColors(
@@ -72,26 +90,43 @@ private val LightMoney = MoneySemanticColors(
 )
 
 private val DarkMoney = MoneySemanticColors(
-    debit = Color(0xFFF2B8B5),
-    credit = Color(0xFFA5D6A7),
-    neutral = Color(0xFFCAC4D0),
+    debit = Palette.TextPrimary,
+    credit = Palette.Income,
+    neutral = Palette.TextSecondary,
 )
 
-/** Dense typography tuned for compact financial rows. */
+/** Rounded, card-forward shapes matching the reference mockups. */
+private val FinTrackShapes = Shapes(
+    extraSmall = RoundedCornerShape(8.dp),
+    small = RoundedCornerShape(12.dp),
+    medium = RoundedCornerShape(16.dp),
+    large = RoundedCornerShape(24.dp),
+    extraLarge = RoundedCornerShape(32.dp),
+)
+
+/** Dense typography tuned for compact financial rows, bold display numbers. */
 private fun financeTypography(): Typography = Typography().let { base ->
     base.copy(
-        bodySmall = base.bodySmall.copy(fontSize = 12.sp, fontFamily = FontFamily.Default),
+        displaySmall = base.displaySmall.copy(fontWeight = FontWeight.ExtraBold, letterSpacing = (-0.5).sp),
+        headlineLarge = base.headlineLarge.copy(fontWeight = FontWeight.ExtraBold),
+        headlineMedium = base.headlineMedium.copy(fontWeight = FontWeight.Bold),
+        headlineSmall = base.headlineSmall.copy(fontSize = 26.sp, fontWeight = FontWeight.ExtraBold, fontFeatureSettings = "tnum"),
+        titleLarge = base.titleLarge.copy(fontWeight = FontWeight.Bold),
+        titleMedium = base.titleMedium.copy(fontSize = 16.sp, fontWeight = FontWeight.SemiBold),
+        titleSmall = base.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+        bodySmall = base.bodySmall.copy(fontSize = 12.sp),
         bodyMedium = base.bodyMedium.copy(fontSize = 14.sp),
-        titleMedium = base.titleMedium.copy(fontSize = 16.sp),
-        headlineSmall = base.headlineSmall.copy(fontSize = 22.sp),
         // Tabular figures keep amount columns aligned.
-        labelLarge = base.labelLarge.copy(fontFeatureSettings = "tnum"),
+        labelLarge = base.labelLarge.copy(fontWeight = FontWeight.SemiBold, fontFeatureSettings = "tnum"),
+        labelMedium = base.labelMedium.copy(fontFeatureSettings = "tnum"),
     )
 }
 
 @Composable
 fun FinTrackTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    // The brand is dark-first by design (see design_screens/ reference mockups);
+    // system light mode is still honored if the caller explicitly asks for it.
+    darkTheme: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     val colors = if (darkTheme) DarkColors else LightColors
@@ -102,6 +137,7 @@ fun FinTrackTheme(
     ) {
         MaterialTheme(
             colorScheme = colors,
+            shapes = FinTrackShapes,
             typography = financeTypography(),
             content = content,
         )

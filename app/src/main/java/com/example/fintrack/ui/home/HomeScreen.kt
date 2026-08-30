@@ -1,29 +1,60 @@
 package com.example.fintrack.ui.home
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Card
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.NotificationsNone
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.WarningAmber
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.fintrack.application.insights.HomeViewModel
 import com.example.fintrack.domain.model.ProgressStatus
+import com.example.fintrack.ui.common.FinTrackCard
+import com.example.fintrack.ui.common.GradientHeroCard
+import com.example.fintrack.ui.common.IconBadge
+import com.example.fintrack.ui.common.LoadingSkeleton
 import com.example.fintrack.ui.common.MoneyRow
 import com.example.fintrack.ui.common.MoneyRowData
+import com.example.fintrack.ui.common.ProgressRing
+import com.example.fintrack.ui.common.SectionHeader
+import com.example.fintrack.ui.common.statusColor
+import com.example.fintrack.ui.theme.Palette
+import java.time.LocalTime
 
 /**
  * Stage 9 P19 — Home dashboard.
@@ -37,125 +68,140 @@ fun HomeScreen(
     viewModel: HomeViewModel,
     onOpenTransactions: () -> Unit = {},
     onOpenReview: () -> Unit = {},
+    onOpenBudgets: () -> Unit = {},
+    onOpenTransaction: (String) -> Unit = {},
+    onAddTransaction: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsState()
+    var balanceHidden by remember { mutableStateOf(false) }
+
+    if (state.loading && state.recent.isEmpty()) {
+        LoadingSkeleton()
+        return
+    }
 
     LazyColumn(
-        Modifier.fillMaxSize().padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        Modifier.fillMaxSize().padding(horizontal = 16.dp),
+        contentPadding = PaddingValues(top = 16.dp, bottom = 96.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
-        item { Text("Home", style = MaterialTheme.typography.titleLarge) }
+        item {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column {
+                    Text(greeting(), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Your finances", style = MaterialTheme.typography.headlineSmall)
+                }
+                IconButton(onClick = onOpenReview) {
+                    Icon(Icons.Filled.NotificationsNone, contentDescription = "Review queue")
+                }
+            }
+        }
 
         state.error?.let { err ->
             item {
-                Card(Modifier.fillMaxWidth()) {
-                    Text(
-                        "Error: $err",
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(12.dp),
+                FinTrackCard(containerColor = Palette.Danger.copy(alpha = 0.12f)) {
+                    Text("Error: $err", color = Palette.Danger)
+                }
+            }
+        }
+
+        // ---- balance hero ----
+        item {
+            GradientHeroCard(
+                label = "Total balance",
+                amountText = if (balanceHidden) {
+                    "•••••"
+                } else {
+                    state.totalBalanceMinor?.let { "₹${paise(it)}" } ?: "No accounts yet"
+                },
+                trailing = {
+                    IconButton(onClick = { balanceHidden = !balanceHidden }) {
+                        Icon(
+                            if (balanceHidden) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                            contentDescription = if (balanceHidden) "Show balance" else "Hide balance",
+                            tint = Color.White,
+                        )
+                    }
+                },
+            ) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    MoneyFlowStat(
+                        icon = Icons.Filled.ArrowDownward,
+                        label = "Income",
+                        amountText = "+₹${paise(state.incomeNetMinor)}",
+                        iconTint = Palette.Income,
+                    )
+                    MoneyFlowStat(
+                        icon = Icons.Filled.ArrowUpward,
+                        label = "Spend",
+                        amountText = "₹${paise(state.spendNetMinor)}",
+                        iconTint = Color.White,
                     )
                 }
             }
         }
 
-        if (state.loading && state.recent.isEmpty()) {
-            item { Text("Loading…", style = MaterialTheme.typography.bodyMedium) }
-        }
-
-        // ---- balances ----
-        item {
-            Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Total balance", style = MaterialTheme.typography.labelMedium)
-                    Text(
-                        text = state.totalBalanceMinor?.let { "₹${paise(it)} ${state.currencyCode}" }
-                            ?: "No accounts yet",
-                        style = MaterialTheme.typography.headlineSmall,
-                        modifier = Modifier.semantics {
-                            contentDescription = state.totalBalanceMinor?.let {
-                                "Total balance ${paise(it)} ${state.currencyCode}"
-                            } ?: "No accounts yet"
-                        },
-                    )
-                }
-            }
-        }
-
-        // ---- this month's flows ----
-        item {
-            Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("This month", style = MaterialTheme.typography.titleMedium)
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Income")
-                        Text("+₹${paise(state.incomeNetMinor)}", color = MaterialTheme.colorScheme.secondary)
-                    }
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Spend (gross)")
-                        Text("₹${paise(state.spendGrossMinor)}")
-                    }
-                    if (state.spendRefundedMinor > 0) {
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Refunds")
-                            Text("−₹${paise(state.spendRefundedMinor)}")
-                        }
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Spend (net)", style = MaterialTheme.typography.labelLarge)
-                            Text("₹${paise(state.spendNetMinor)}", style = MaterialTheme.typography.labelLarge)
+        // ---- needs attention ----
+        if (state.openReviewCount > 0 || state.pendingStatusCount > 0) {
+            item {
+                FinTrackCard(
+                    modifier = Modifier.clickable(onClick = onOpenReview),
+                    containerColor = Palette.Warn.copy(alpha = 0.12f),
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Icon(Icons.Filled.WarningAmber, contentDescription = null, tint = Palette.Warn)
+                        Column {
+                            Text("Needs attention", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
+                            Text(
+                                "${state.openReviewCount} to review · ${state.pendingStatusCount} pending",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
                     }
                 }
             }
         }
 
-        // ---- budget progress ----
+        // ---- budgets ----
         if (state.budgets.isNotEmpty()) {
-            item { Text("Budgets", style = MaterialTheme.typography.titleMedium) }
-            items(state.budgets, key = { it.name }) { card ->
-                Card(Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text(card.name, style = MaterialTheme.typography.bodyLarge)
-                            Text(statusLabel(card.progress.status), style = MaterialTheme.typography.labelLarge)
-                        }
-                        LinearProgressIndicator(
-                            progress = { card.progress.usageRatio.toFloat().coerceIn(0f, 1f) },
-                            modifier = Modifier.fillMaxWidth().height(6.dp),
-                        )
-                        Text(
-                            "₹${paise(card.progress.effectiveUsageMinor)} of ₹${paise(card.progress.targetMinor)}",
-                            style = MaterialTheme.typography.bodySmall,
-                        )
+            item { SectionHeader("Budgets", actionLabel = "See all", onAction = onOpenBudgets) }
+            item {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    items(state.budgets, key = { it.name }) { card ->
+                        BudgetMiniCard(card)
                     }
-                }
-            }
-        }
-
-        // ---- review / pending counts ----
-        item {
-            Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Needs attention", style = MaterialTheme.typography.titleMedium)
-                    Text("${state.openReviewCount} open review item(s)")
-                    Text("${state.pendingStatusCount} pending interpretation(s)")
                 }
             }
         }
 
         // ---- recent transactions ----
-        item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Recent", style = MaterialTheme.typography.titleMedium)
+        item { SectionHeader("Recent", actionLabel = "See all", onAction = onOpenTransactions) }
+        if (state.recent.isEmpty()) {
+            item {
+                Text(
+                    "No transactions yet.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
         items(state.recent, key = { it.id }) { txn ->
+            val label = txn.merchant ?: txn.counterpartyNormalized ?: "Transaction"
             MoneyRow(
                 MoneyRowData(
-                    title = txn.merchant ?: txn.counterpartyNormalized ?: "Transaction",
+                    title = label,
                     amountMinor = if (txn.directionDebit) -txn.amountMinor else txn.amountMinor,
                     currencyCode = txn.currencyCode,
                     isDebit = txn.directionDebit,
-                )
+                    subtitle = if (txn.directionDebit) "Expense" else "Income",
+                    categoryLabel = label,
+                ),
+                onClick = { onOpenTransaction(txn.id) },
             )
         }
 
@@ -168,6 +214,59 @@ fun HomeScreen(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun MoneyFlowStat(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, amountText: String, iconTint: Color) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Box(
+            Modifier.size(28.dp).background(Color.White.copy(alpha = 0.18f), CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(16.dp))
+        }
+        Column {
+            Text(label, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.75f))
+            Text(amountText, style = MaterialTheme.typography.titleSmall, color = Color.White)
+        }
+    }
+}
+
+@Composable
+private fun BudgetMiniCard(card: HomeViewModel.BudgetCard) {
+    FinTrackCard(modifier = Modifier.width(160.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            ProgressRing(
+                progress = card.progress.usageRatio.toFloat(),
+                modifier = Modifier.size(40.dp),
+                strokeWidth = 5.dp,
+                progressColor = statusColor(card.progress.status),
+            )
+            Column {
+                Text(
+                    card.name,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    "${(card.progress.usageRatio * 100).toInt()}% used",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+private fun greeting(): String {
+    val hour = LocalTime.now().hour
+    return when {
+        hour < 12 -> "Good morning"
+        hour < 17 -> "Good afternoon"
+        else -> "Good evening"
     }
 }
 
