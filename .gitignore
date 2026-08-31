@@ -35,3 +35,6 @@ env/
 *.log
 tmp.txt
 count
+
+inject_llm_config.xml
+pp.ipynb
