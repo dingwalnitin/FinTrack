@@ -23,7 +23,7 @@ import java.net.URL
  * the fresh values on the next request (otherwise a first-run provider built
  * from an empty config would stay misconfigured forever).
  */
-class ChatCompletionsProvider(
+open class ChatCompletionsProvider(
     private val configProvider: () -> LlmConfig,
     private val connectTimeoutMs: Int = 15_000,
     private val readTimeoutMs: Int = 180_000,
@@ -78,9 +78,18 @@ class ChatCompletionsProvider(
      * The [prompt] is sent as a single system message instructing the model
      * to return strict JSON; the model's `content` field is returned raw.
      */
-    override suspend fun complete(prompt: String): String {
+    override suspend fun complete(prompt: String): String =
+        completeWithKey(prompt, apiKey = null)
+
+    /**
+     * Execute one enrichment request using a specific [apiKey].
+     */
+    open suspend fun completeWithKey(prompt: String, apiKey: String? = null): String {
         val cfg = configProvider()
-        require(cfg.isValid) { "LLM not configured: set base URL, API key and model in Settings" }
+        val key = apiKey ?: cfg.apiKey
+        require(cfg.baseUrl.isNotBlank() && cfg.modelId.isNotBlank() && key.isNotBlank()) {
+            "LLM not configured: set base URL, API key and model in Settings"
+        }
 
         val payload = JSONObject()
             .put("model", cfg.modelId)
@@ -98,7 +107,7 @@ class ChatCompletionsProvider(
             conn.readTimeout = readTimeoutMs
             conn.setRequestProperty("Content-Type", "application/json")
             conn.setRequestProperty("Accept", "application/json")
-            conn.setRequestProperty("Authorization", "Bearer ${cfg.apiKey}")
+            conn.setRequestProperty("Authorization", "Bearer $key")
             conn.doOutput = true
 
             conn.outputStream.use { os: OutputStream ->
@@ -108,7 +117,8 @@ class ChatCompletionsProvider(
             val code = conn.responseCode
             if (code !in 200..299) {
                 val errBody = conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
-                throw classifyHttpError(code, errBody)
+                val retryAfter = conn.getHeaderField("Retry-After")
+                throw classifyHttpError(code, errBody, retryAfter)
             }
 
             val raw = conn.inputStream.bufferedReader().use { it.readText() }
@@ -327,15 +337,19 @@ class ChatCompletionsProvider(
     }
 
     /** Map an HTTP status to a normalized [LlmErrorClass]. */
-    private fun classifyHttpError(code: Int, body: String): LlmProviderException = when (code) {
+    private fun classifyHttpError(code: Int, body: String, retryAfterHeader: String? = null): LlmProviderException = when (code) {
         401, 403 -> LlmProviderException(
             errorClass = LlmErrorClass.SCHEMA_VALIDATION_FAILED,
             message = "LLM API rejected the request (HTTP $code): check your API key / base URL",
         )
-        429 -> LlmProviderException(
-            errorClass = LlmErrorClass.RATE_LIMITED,
-            message = "LLM API rate limit hit (HTTP 429)",
-        )
+        429 -> {
+            val retryAfterMs = parseRetryAfter(retryAfterHeader)
+            LlmProviderException(
+                errorClass = LlmErrorClass.RATE_LIMITED,
+                message = "LLM API rate limit hit (HTTP 429)",
+                retryAfterMs = retryAfterMs,
+            )
+        }
         in 500..599 -> LlmProviderException(
             errorClass = LlmErrorClass.PROVIDER_UNAVAILABLE,
             message = "LLM API unavailable (HTTP $code)",
@@ -344,6 +358,17 @@ class ChatCompletionsProvider(
             errorClass = LlmErrorClass.SCHEMA_VALIDATION_FAILED,
             message = "LLM API returned HTTP $code: $body",
         )
+    }
+
+    private fun parseRetryAfter(header: String?): Long? {
+        if (header.isNullOrBlank()) return null
+        header.trim().toLongOrNull()?.let { return it * 1000L }
+        return try {
+            val date = java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME.parse(header.trim(), java.time.Instant::from)
+            (date.toEpochMilli() - System.currentTimeMillis()).coerceAtLeast(1000L)
+        } catch (e: Exception) {
+            null
+        }
     }
 
     /** Pull the `choices[0].message.content` string out of a Chat Completions response. */

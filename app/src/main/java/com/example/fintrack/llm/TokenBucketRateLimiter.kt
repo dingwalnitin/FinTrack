@@ -9,19 +9,25 @@ import kotlinx.coroutines.sync.withLock
  *
  * The bucket fills at [tokensPerSecond] and holds at most [maxTokens] tokens.
  * Each call to [acquire] consumes one token, blocking until one is available.
- * Bursts are bounded by [maxTokens] (e.g. 60 tokens with 1/sec fill = 60
- * burst, then 1/sec steady).
+ * Bursts are bounded by [maxTokens].
  *
+ * Supports fractional tokens per second (e.g. 25 requests / 60 seconds = 0.416667 tokens/sec).
  * Thread-safe via mutex.
  */
 class TokenBucketRateLimiter(
-    /** Steady-state tokens per second (e.g. 3 for 3 RPM with 60s refill). */
-    private val tokensPerSecond: Int = 3,
-    /** Maximum burst capacity (e.g. 10 for a burst of 10 then steady). */
-    private val maxTokens: Int = 10,
+    /** Steady-state tokens per second (e.g. 25.0 / 60.0 for 25 RPM). */
+    private val tokensPerSecond: Double = 25.0 / 60.0,
+    /** Maximum burst capacity (e.g. 1.0 for strictly steady, or 2.0 conservative burst). */
+    private val maxTokens: Double = 1.0,
 ) {
+    /** Secondary constructor for integer arguments (backward compatibility). */
+    constructor(tokensPerSecond: Int, maxTokens: Int) : this(
+        tokensPerSecond = tokensPerSecond.toDouble(),
+        maxTokens = maxTokens.toDouble(),
+    )
+
     /** Current token count (may be fractional). */
-    private var tokens: Double = maxTokens.toDouble()
+    private var tokens: Double = maxTokens
     private var lastRefillEpochMs: Long = System.currentTimeMillis()
     private val mutex = Mutex()
 
@@ -30,13 +36,6 @@ class TokenBucketRateLimiter(
      * pattern — use from a background coroutine, never from the UI thread).
      */
     suspend fun acquire() {
-        // Never manually unlock() inside withLock: if the coroutine is
-        // cancelled while waiting (e.g. LlmProcessingService.stopScan()) or
-        // another coroutine observes the lock in between, we would call
-        // unlock() on an unheld mutex -> IllegalStateException("Mutex is not
-        // locked"). Instead, compute the wait time under the lock, release it
-        // cleanly, and only then sleep. Cancellation during delay() then simply
-        // propagates normally.
         while (true) {
             val waitMs = mutex.withLock {
                 refill()
@@ -44,7 +43,8 @@ class TokenBucketRateLimiter(
                     tokens -= 1.0
                     return
                 }
-                ((1.0 - tokens) / tokensPerSecond * 1000).toLong().coerceAtLeast(50)
+                val needed = 1.0 - tokens
+                ((needed / tokensPerSecond) * 1000.0).toLong().coerceAtLeast(50L)
             }
             delay(waitMs)
         }
@@ -62,12 +62,26 @@ class TokenBucketRateLimiter(
         }
     }
 
+    /** Returns the milliseconds until at least 1.0 token is available (0 if already available). */
+    suspend fun timeUntilNextTokenMs(): Long = mutex.withLock {
+        refill()
+        if (tokens >= 1.0) {
+            0L
+        } else {
+            val needed = 1.0 - tokens
+            ((needed / tokensPerSecond) * 1000.0).toLong().coerceAtLeast(0L)
+        }
+    }
+
     /** Current token count (approximate, for UI display). */
-    suspend fun availableTokens(): Int = mutex.withLock { tokens.toInt().coerceAtLeast(0) }
+    suspend fun availableTokens(): Int = mutex.withLock {
+        refill()
+        tokens.toInt().coerceAtLeast(0)
+    }
 
     /** Reset — for testing. */
     fun reset() {
-        tokens = maxTokens.toDouble()
+        tokens = maxTokens
         lastRefillEpochMs = System.currentTimeMillis()
     }
 
@@ -76,7 +90,7 @@ class TokenBucketRateLimiter(
         val elapsed = now - lastRefillEpochMs
         if (elapsed > 0) {
             val added = (elapsed.toDouble() / 1000.0) * tokensPerSecond
-            tokens = (tokens + added).coerceAtMost(maxTokens.toDouble())
+            tokens = (tokens + added).coerceAtMost(maxTokens)
             lastRefillEpochMs = now
         }
     }

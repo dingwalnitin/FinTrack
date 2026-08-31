@@ -1,10 +1,15 @@
 package com.example.fintrack.llm
 
 /**
- * P07: prompt construction. Builds a compact, evidence-labeled prompt from
- * normalized SMS plus minimal metadata. Every input is explicitly labeled as
- * evidence, not truth. Nearby same-sender messages are included only within
- * the configured time window and only for duplicate/missing-detail resolution.
+ * Task 3: Prompt construction (enrich-prompt-v2).
+ *
+ * Uses explicit XML delimiters to structure sections:
+ * - <system_role>: Role and core instructions.
+ * - <rules_and_constraints>: Strict evidence-only bounds and anti-hallucination rules.
+ * - <output_schema>: Complete JSON schema with exact types and enum variants.
+ * - <confidence_guidelines>: Calibration criteria for field and overall confidence.
+ * - <few_shot_examples>: 3 representative examples (Happy path, Non-financial, Insufficient evidence).
+ * - <evidence>: Primary message body text and conditional nearby context.
  */
 object PromptBuilder {
 
@@ -12,72 +17,76 @@ object PromptBuilder {
     const val MAX_NEARBY = 3
 
     fun build(request: ParseRequest): String = buildString {
-        appendLine("You are a strict JSON-extraction engine for a personal finance tracker.")
-        appendLine("You receive ONE bank SMS message as evidence. Extract ONLY the fields the")
-        appendLine("message explicitly states. Output ONLY a single JSON object — no prose,")
-        appendLine("no markdown fences, no comments — that validates against the schema below.")
+        appendLine("<system_role>")
+        appendLine("You are a strict, deterministic JSON extraction engine for a personal finance tracker.")
+        appendLine("You receive ONE bank SMS message as evidence. Extract ONLY the fields the message explicitly states.")
+        appendLine("Output ONLY a single JSON object with no prose, no markdown fences (```), and no comments.")
+        appendLine("</system_role>")
         appendLine()
-        appendLine("RULES:")
-        appendLine("1. All inputs below are EVIDENCE, not truth. Extract only what the text supports.")
-        appendLine("2. Never invent identifiers, amounts, dates or names absent from the evidence.")
-        appendLine("3. Unknown fields must be omitted or null — never guessed.")
-        appendLine("4. amountMinor is the amount in minor units (paise for INR):")
-        appendLine("   e.g. \"Rs.250\" -> 25000, \"₹1,250.50\" -> 125050, \"INR 10\" -> 1000.")
-        appendLine("5. direction: DEBIT when money left the account (debited/spent/withdrawn),")
-        appendLine("   CREDIT when money arrived (credited/deposited/refund).")
-        appendLine("6. occurredAtEpochMs: the transaction time in epoch milliseconds if the SMS")
-        appendLine("   states a date/time; otherwise omit it.")
-        appendLine("7. Every extracted value must appear in the message text verbatim or be an")
-        appendLine("   exact numeric/date conversion of it.")
-        appendLine("8. If the message is NOT a completed financial transaction (OTP/verification")
-        appendLine("   codes, login alerts, marketing/promotional offers, delivery/service")
-        appendLine("   notifications, balance enquiries with no transfer, or future-dated/scheduled")
-        appendLine("   reminders), set \"isFinancial\": false, give a short \"reason\", and omit every")
-        appendLine("   other field.")
-        appendLine("9. Respond with ONLY a JSON object matching schema ${request.schemaVersion}:")
+        appendLine("<rules_and_constraints>")
+        appendLine("1. All input data in <evidence> is EVIDENCE, not truth. Extract only what the text explicitly supports.")
+        appendLine("2. Never invent, estimate, or guess identifiers, amounts, dates, accounts, or names absent from the evidence.")
+        appendLine("3. Unknown or unmentioned fields must be omitted or null — never guessed.")
+        appendLine("4. amountMinor: integer in minor units (paise for INR, e.g. \"Rs.250\" -> 25000, \"₹1,250.50\" -> 125050).")
+        appendLine("5. direction: DEBIT when money left the account (debited/spent/withdrawn/sent/paid), CREDIT when money arrived (credited/deposited/received/refund).")
+        appendLine("6. occurredAtEpochMs: transaction timestamp in epoch milliseconds if stated; otherwise omit or null.")
+        appendLine("7. HARD CONSTRAINT: If required transaction fields (amount, transaction direction) are not explicitly and unambiguously present in the message text, you MUST return {\"isFinancial\": false, \"reason\": \"insufficient_evidence\"}. Never guess.")
+        appendLine("8. If the message is NOT a completed financial transaction (OTP/2FA verification codes, login alerts, promotional/marketing offers, spam, delivery/service updates, balance enquiries without transfer, or future reminders), set \"isFinancial\": false, give a short \"reason\", and omit all financial fields.")
+        appendLine("</rules_and_constraints>")
         appendLine()
-        appendLine("SCHEMA ${request.schemaVersion}:")
+        appendLine("<output_schema version=\"${request.schemaVersion}\">")
         appendLine("{")
-        appendLine("  \"isFinancial\": bool,               // REQUIRED, false if not a completed transaction")
-        appendLine("  \"reason\": string|null,             // brief reason when isFinancial is false")
-        appendLine("  \"amountMinor\": int,                // REQUIRED if isFinancial is true")
-        appendLine("  \"currencyCode\": \"INR\",             // REQUIRED if isFinancial is true, 3-letter ISO")
+        appendLine("  \"isFinancial\": boolean,             // REQUIRED: false if not a completed financial transaction or if evidence is insufficient")
+        appendLine("  \"reason\": string | null,           // Brief explanation when isFinancial is false (e.g. \"OTP verification\", \"insufficient_evidence\")")
+        appendLine("  \"amountMinor\": integer,            // REQUIRED if isFinancial is true (in paise, > 0)")
+        appendLine("  \"currencyCode\": \"INR\",             // REQUIRED if isFinancial is true (3-letter ISO code)")
         appendLine("  \"direction\": \"DEBIT\" | \"CREDIT\",  // REQUIRED if isFinancial is true")
-        appendLine("  \"accountToken\": string|null,       // masked suffix e.g. \"XX1234\" if present")
-        appendLine("  \"rail\": string|null,               // UPI | IMPS | NEFT | RTGS | CARD_POS | CARD_ONLINE | ATM | ACH | UNKNOWN")
-        appendLine("  \"counterpartyRaw\": string|null,    // payee/merchant name as written")
-        appendLine("  \"counterpartyNormalized\": string|null, // normalized name")
-        appendLine("  \"categorySuggestion\": string|null, // e.g. \"Groceries\", \"Utilities\"")
-        appendLine("  \"transferTargetToken\": string|null,")
-        appendLine("  \"recurring\": bool|null,            // true only if the SMS indicates recurrence")
-        appendLine("  \"emiDetail\": string|null,")
-        appendLine("  \"occurredAtEpochMs\": long|null,")
-        appendLine("  \"confidence\": { \"fieldName\": { \"value\": 0.0..1.0, \"explanation\": \"why\" } },")
-        appendLine("  \"overallConfidence\": 0.0..1.0|null")
+        appendLine("  \"accountToken\": string | null,     // Masked suffix e.g. \"XX1234\" if stated")
+        appendLine("  \"rail\": \"UPI\" | \"IMPS\" | \"NEFT\" | \"RTGS\" | \"CARD_POS\" | \"CARD_ONLINE\" | \"ATM\" | \"ACH\" | \"UNKNOWN\" | null,")
+        appendLine("  \"counterpartyRaw\": string | null,  // Payee/merchant name as written in message")
+        appendLine("  \"counterpartyNormalized\": string | null, // Cleaned/normalized payee/merchant name")
+        appendLine("  \"categorySuggestion\": string | null, // e.g. \"Groceries\", \"Utilities\", \"Dining\"")
+        appendLine("  \"transferTargetToken\": string | null,")
+        appendLine("  \"recurring\": boolean | null,       // true only if explicitly stated as recurring/mandate/autopay")
+        appendLine("  \"emiDetail\": string | null,")
+        appendLine("  \"occurredAtEpochMs\": integer | null,")
+        appendLine("  \"confidence\": { \"<field>\": { \"value\": 0.0..1.0, \"explanation\": \"string\" } },")
+        appendLine("  \"overallConfidence\": 0.0..1.0 | null")
         appendLine("}")
+        appendLine("</output_schema>")
         appendLine()
-        appendLine("EXAMPLE (do not copy values, follow the shape):")
-        appendLine("{\"isFinancial\": true, \"amountMinor\": 25000, \"currencyCode\": \"INR\", \"direction\": \"DEBIT\",")
-        appendLine(" \"accountToken\": \"XX1234\", \"rail\": \"UPI\", \"counterpartyRaw\": \"BigBazaar\",")
-        appendLine(" \"counterpartyNormalized\": \"Big Bazaar\", \"categorySuggestion\": \"Groceries\",")
-        appendLine(" \"confidence\": {\"amount\": {\"value\": 0.99, \"explanation\": \"Rs.250 stated verbatim\"}}}")
+        appendLine("<confidence_guidelines>")
+        appendLine("- High (0.90 - 1.0): Field is explicitly, verbatim stated in the message text.")
+        appendLine("- Medium (0.60 - 0.89): Inferred from unambiguous context or standard rail keywords without guessing.")
+        appendLine("- Low (< 0.60): Ambiguous or incomplete context.")
+        appendLine("</confidence_guidelines>")
         appendLine()
-        appendLine("EXAMPLE (non-financial):")
+        appendLine("<few_shot_examples>")
+        appendLine("Example 1 (Valid financial transaction - happy path):")
+        appendLine("{\"isFinancial\": true, \"amountMinor\": 25000, \"currencyCode\": \"INR\", \"direction\": \"DEBIT\", \"accountToken\": \"XX1234\", \"rail\": \"UPI\", \"counterpartyRaw\": \"BigBazaar\", \"counterpartyNormalized\": \"Big Bazaar\", \"categorySuggestion\": \"Groceries\", \"confidence\": {\"amount\": {\"value\": 0.99, \"explanation\": \"Rs.250 stated verbatim\"}, \"direction\": {\"value\": 0.99, \"explanation\": \"debited stated verbatim\"}}, \"overallConfidence\": 0.98}")
+        appendLine()
+        appendLine("Example 2 (Non-financial message - OTP / Promo / Alert):")
         appendLine("{\"isFinancial\": false, \"reason\": \"OTP verification code\"}")
         appendLine()
-        appendLine("EVIDENCE (primary message id=${request.sourceMessageId}, receivedAt=${request.receivedAtEpochMs}):")
+        appendLine("Example 3 (Insufficient evidence / Ambiguous message):")
+        appendLine("{\"isFinancial\": false, \"reason\": \"insufficient_evidence: missing amount and account\"}")
+        appendLine("</few_shot_examples>")
+        appendLine()
+        appendLine("<evidence id=\"${request.sourceMessageId}\" receivedAt=\"${request.receivedAtEpochMs}\">")
         appendLine(request.bodyText)
         val nearby = request.nearbyEvidence.take(MAX_NEARBY)
         if (nearby.isNotEmpty()) {
             appendLine()
-            appendLine("EVIDENCE (nearby same-sender context, for duplicate/missing-detail resolution only):")
+            appendLine("<nearby_context>")
             nearby.forEach { n ->
                 appendLine("- [id=${n.sourceMessageId} at=${n.receivedAtEpochMs}] ${n.bodyText}")
             }
+            appendLine("</nearby_context>")
         }
+        appendLine("</evidence>")
     }
 
-    /** Deterministic semantic-input hash key for caching (P08). */
+    /** Deterministic semantic-input hash key for caching. Accounts for promptVersion and schemaVersion. */
     fun cacheKey(request: ParseRequest, providerId: String, modelId: String): String =
         listOf(
             request.bodyText.trim(),

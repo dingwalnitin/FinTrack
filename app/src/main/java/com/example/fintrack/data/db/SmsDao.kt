@@ -49,6 +49,14 @@ interface SmsDao {
     @Query("SELECT * FROM raw_sms WHERE id = :id LIMIT 1")
     suspend fun rawSmsById(id: String): RawSmsEntity?
 
+    /**
+     * Raw evidence rows received at or after [receivedAfterEpochMs], ordered
+     * oldest-first. Used to bound the batch scan lookback (e.g. last 90 days)
+     * so an old backlog is not re-sent through the LLM on every scan.
+     */
+    @Query("SELECT * FROM raw_sms WHERE receivedAtEpochMs >= :receivedAfterEpochMs ORDER BY receivedAtEpochMs ASC, providerId ASC")
+    suspend fun rawRowsSince(receivedAfterEpochMs: Long): List<RawSmsEntity>
+
     // ---- sms_backfill_cursor ----
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)

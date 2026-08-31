@@ -12,7 +12,7 @@ package com.example.fintrack.llm
  *    prompt evolves (P08 migration path).
  */
 
-const val PROMPT_VERSION = "enrich-prompt-v1"
+const val PROMPT_VERSION = "enrich-prompt-v2"
 const val SCHEMA_VERSION = "enrich-schema-v1"
 
 /** Minimal normalized evidence handed to the model. Never raw truth. */

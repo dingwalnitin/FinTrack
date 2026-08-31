@@ -3,6 +3,7 @@ package com.example.fintrack.llm
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
@@ -64,5 +65,47 @@ class TokenBucketRateLimiterTest {
         assertTrue(limiter.availableTokens() < 4)
         limiter.reset()
         assertEquals(4, limiter.availableTokens())
+    }
+
+    @Test
+    fun `timeUntilNextTokenMs is zero when token available`() = runBlocking {
+        val limiter = TokenBucketRateLimiter(tokensPerSecond = 100, maxTokens = 1)
+        assertEquals(0L, limiter.timeUntilNextTokenMs())
+    }
+
+    @Test
+    fun `timeUntilNextTokenMs is positive when bucket empty`() = runBlocking {
+        val limiter = TokenBucketRateLimiter(tokensPerSecond = 2, maxTokens = 1)
+        limiter.tryAcquire() // drain the single token
+        val wait = limiter.timeUntilNextTokenMs()
+        assertTrue("expected positive wait, got $wait", wait > 0L)
+    }
+
+    @Test
+    fun `timeUntilNextTokenMs returns zero after reset`() = runBlocking {
+        val limiter = TokenBucketRateLimiter(tokensPerSecond = 2, maxTokens = 1)
+        limiter.tryAcquire()
+        limiter.reset()
+        assertEquals(0L, limiter.timeUntilNextTokenMs())
+    }
+
+    @Test
+    fun `fractional refill accumulates tokens over time`() = runBlocking {
+        // Uses runBlocking (real time) because runTest virtual time can't
+        // advance System.currentTimeMillis() used inside the rate limiter.
+        val limiter = TokenBucketRateLimiter(tokensPerSecond = 60.0, maxTokens = 1.0)
+        assertTrue(limiter.tryAcquire()) // consume the one token
+
+        val wait = limiter.timeUntilNextTokenMs()
+        Thread.sleep(wait + 20)
+        assertTrue("token should have refilled after delay", limiter.tryAcquire())
+    }
+
+    @Test
+    fun `availableTokens reflects fractional refill after consumption`() = runBlocking {
+        val limiter = TokenBucketRateLimiter(tokensPerSecond = 60.0, maxTokens = 1.0)
+        limiter.tryAcquire()
+        // Right after consuming, no full token available.
+        assertEquals(0, limiter.availableTokens())
     }
 }

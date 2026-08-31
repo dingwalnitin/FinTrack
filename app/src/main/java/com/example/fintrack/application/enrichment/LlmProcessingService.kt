@@ -194,8 +194,9 @@ class LlmProcessingService(
     private suspend fun runOnePass() {
         _progress.value = Progress(running = true, status = "SCANNING")
 
+        val cutoff = System.currentTimeMillis() - BATCH_LOOKBACK_DAYS * DAY_MILLIS
         val rows = try {
-            smsDao.allRawRows()
+            smsDao.rawRowsSince(cutoff)
         } catch (t: Throwable) {
             currentCoroutineContext().ensureActive()
             _progress.update {
@@ -207,19 +208,27 @@ class LlmProcessingService(
             return
         }
 
-        if (rows.isEmpty()) {
+        val directIds = takeRequestedDirectIds()
+        val directRows = if (directIds.isNotEmpty()) {
+            directIds.mapNotNull { id -> rows.firstOrNull { it.id == id } ?: smsDao.rawSmsById(id) }
+        } else {
+            emptyList()
+        }
+
+        val allRows = (rows + directRows).distinctBy { it.id }
+
+        if (allRows.isEmpty()) {
             _progress.update { it.copy(running = false, status = "COMPLETE", total = 0) }
             return
         }
 
-        val total = rows.size.toLong()
+        val total = allRows.size.toLong()
 
         // Two bulk queries instead of one per row: anything already interpreted
         // or carrying a terminal outcome is done and must not be re-sent.
         val settled = jobStore.settledMessageIds()
-        val pendingRows = rows.filterNot { it.id in settled }
-        val directIds = takeRequestedDirectIds()
-        val directRows = pendingRows.filter { it.id in directIds }
+        val pendingRows = allRows.filterNot { it.id in settled }
+        val pendingDirectRows = pendingRows.filter { it.id in directIds }
         val batchRows = pendingRows.filterNot { it.id in directIds }
         val triageBatchCount = (batchRows.size + TRIAGE_BATCH_SIZE - 1) / TRIAGE_BATCH_SIZE
         _progress.update {
@@ -237,7 +246,7 @@ class LlmProcessingService(
         }
 
         _progress.update { it.copy(status = "PROCESSING") }
-        processPipeline(directRows, batchRows)
+        processPipeline(pendingDirectRows, batchRows)
         persistRoutingCounters()
 
         val processed = _progress.value.processed
@@ -688,5 +697,7 @@ class LlmProcessingService(
         const val NON_FINANCIAL_ERROR_CLASS = "NON_FINANCIAL_SMS"
         const val METRIC_BATCH_TRIAGED = "llm.triage.batched.total"
         const val METRIC_DIRECT_TRIAGED = "llm.triage.direct.total"
+        const val BATCH_LOOKBACK_DAYS = 90L
+        const val DAY_MILLIS = 86_400_000L
     }
 }

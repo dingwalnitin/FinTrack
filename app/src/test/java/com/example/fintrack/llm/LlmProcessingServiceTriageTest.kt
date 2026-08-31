@@ -106,6 +106,9 @@ class LlmProcessingServiceTriageTest {
     }
 
     /** In-memory [SmsDao] fake — only [allRawRows] is exercised by the service. */
+    private val now = System.currentTimeMillis()
+    private val dayMs = 86_400_000L
+
     private class FakeSmsDao(var rows: List<RawSmsEntity>) : SmsDao {
         override suspend fun insertRawBatch(rows: List<RawSmsEntity>): List<Long> = emptyList()
         override fun observeRawCount(): Flow<Long> = MutableStateFlow(rows.size.toLong())
@@ -114,6 +117,8 @@ class LlmProcessingServiceTriageTest {
         override suspend fun findByContentHash(hash: String): RawSmsEntity? = null
         override suspend fun allRawRows(): List<RawSmsEntity> = rows
         override suspend fun rawSmsById(id: String): RawSmsEntity? = rows.find { it.id == id }
+        override suspend fun rawRowsSince(receivedAfterEpochMs: Long): List<RawSmsEntity> =
+            rows.filter { it.receivedAtEpochMs >= receivedAfterEpochMs }
         override suspend fun upsertCursor(cursor: SmsBackfillCursorEntity) {}
         override suspend fun getCursor(): SmsBackfillCursorEntity? = null
         override fun observeCursor(): Flow<SmsBackfillCursorEntity?> = MutableStateFlow(null)
@@ -125,7 +130,7 @@ class LlmProcessingServiceTriageTest {
     private fun row(
         id: String,
         body: String = "some SMS body $id",
-        receivedAt: Long = 1_000L,
+        receivedAt: Long = now,
         sourceKind: String = "BACKFILL",
     ) = RawSmsEntity(
         id = id, providerId = id.hashCode().toLong(), sender = "BANK", receivedAtEpochMs = receivedAt,

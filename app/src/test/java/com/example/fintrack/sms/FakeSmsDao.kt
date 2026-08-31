@@ -53,6 +53,10 @@ class FakeSmsDao : SmsDao {
     override suspend fun rawSmsById(id: String): RawSmsEntity? =
         rows.firstOrNull { it.id == id }
 
+    override suspend fun rawRowsSince(receivedAfterEpochMs: Long): List<RawSmsEntity> =
+        rows.filter { it.receivedAtEpochMs >= receivedAfterEpochMs }
+            .sortedWith(compareBy<RawSmsEntity> { it.receivedAtEpochMs }.thenBy { it.providerId })
+
     override suspend fun upsertCursor(cursor: SmsBackfillCursorEntity) {
         cursorFlow.value = cursor
     }

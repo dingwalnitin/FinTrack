@@ -145,17 +145,13 @@ class FinTrackApplication : Application() {
     }
 
     /**
-     * Rate-limited wrapper around [chatCompletionsProvider]: every LLM call
-     * first acquires a token from a token bucket (default ~3 req/sec steady,
-     * burst 10), so ALL SMS processing through the LLM is throttled.
+     * Multi-API-Key pooled rate-limited provider: distributes requests across
+     * all configured and enabled API keys (25 req/min, 1,000 req/day per key).
      */
     val rateLimitedLlmProvider: com.example.fintrack.llm.LlmProvider by lazy {
-        com.example.fintrack.llm.RateLimitedLlmProvider(
-            delegate = chatCompletionsProvider,
-            rateLimiter = com.example.fintrack.llm.TokenBucketRateLimiter(
-                tokensPerSecond = 3,
-                maxTokens = 10,
-            ),
+        com.example.fintrack.llm.KeyPooledLlmProvider(
+            configProvider = { llmConfigStore.load() },
+            chatCompletionsProvider = chatCompletionsProvider,
         )
     }
 
