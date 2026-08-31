@@ -1,7 +1,6 @@
 package com.example.fintrack.ui.accounts
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -74,8 +73,7 @@ fun AccountsScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text("Accounts", style = MaterialTheme.typography.headlineSmall)
-            EmptyState("No accounts yet — add your first one below")
-            AddAccountForm(viewModel)
+            EmptyState("No accounts yet — accounts are auto-detected from your SMS")
         }
         is UiState.Error -> ErrorState(message = s.message)
         is UiState.Content -> LazyColumn(
@@ -117,7 +115,14 @@ fun AccountsScreen(
                     }
                 }
             }
-            item { AddAccountForm(viewModel) }
+            item {
+                Text(
+                    "Accounts are auto-detected from your bank SMS. No manual entry needed.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
         }
         else -> Unit
     }
@@ -181,70 +186,6 @@ private fun EditBalanceCard(acct: AccountUi, onEditBalance: (String) -> Unit) {
                 enabled = balance.trim().toDoubleOrNull() != null,
             ) { Text("Save") }
         }
-    }
-}
-
-/**
- * Manual add form. last4 is optional — unknown suffix stays unknown; the same
- * last4 may be reused across accounts without conflict.
- */
-@Composable
-private fun AddAccountForm(viewModel: AccountsViewModel) {
-    var nickname by remember { mutableStateOf("") }
-    var institution by remember { mutableStateOf("") }
-    var last4 by remember { mutableStateOf("") }
-    var currency by remember { mutableStateOf("INR") }
-    var type by remember { mutableStateOf(AccountType.BANK) }
-    var opening by remember { mutableStateOf("") }
-
-    FinTrackCard {
-        Text("Add account", style = MaterialTheme.typography.titleMedium)
-        Spacer(Modifier.height(12.dp))
-        Row(
-            modifier = Modifier.horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            AccountType.entries.forEach { t ->
-                IconBadge(
-                    icon = accountTypeIcon(t),
-                    containerColor = if (type == t) Palette.Violet else Palette.SurfaceHigh,
-                    tint = if (type == t) androidx.compose.ui.graphics.Color.White else Palette.TextSecondary,
-                    size = 44.dp,
-                    modifier = Modifier.clickable(onClick = { type = t }),
-                )
-            }
-        }
-        Spacer(Modifier.height(4.dp))
-        Text(
-            type.name.replace('_', ' '),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(12.dp))
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            OutlinedTextField(nickname, { nickname = it }, label = { Text("Nickname") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(institution, { institution = it }, label = { Text("Bank / institution (optional)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(last4, { if (it.length <= 4 && it.all(Char::isDigit)) last4 = it }, label = { Text("Last 4 digits (optional)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(currency, { currency = it }, label = { Text("Currency (INR/USD)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(opening, { opening = it }, label = { Text("Opening balance (major units, optional)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-        }
-        Spacer(Modifier.height(16.dp))
-        Button(
-            onClick = {
-                val openingMinor = opening.toDoubleOrNull()
-                    ?.let { Math.round(it * 100) } ?: 0L
-                viewModel.addAccount(
-                    nickname = nickname.trim(), type = type,
-                    currencyCode = currency.trim().uppercase().ifBlank { "INR" },
-                    last4 = last4.ifBlank { null },
-                    institution = institution.trim().ifBlank { null },
-                    openingBalanceMinor = openingMinor,
-                )
-                nickname = ""; institution = ""; last4 = ""; opening = ""
-            },
-            enabled = nickname.isNotBlank(),
-            modifier = Modifier.fillMaxWidth(),
-        ) { Text("Save account") }
     }
 }
 

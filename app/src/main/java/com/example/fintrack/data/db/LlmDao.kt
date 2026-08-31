@@ -136,8 +136,26 @@ abstract class LlmDao : LlmSchedulerDao {
     @Query("SELECT * FROM llm_interpretations WHERE sourceMessageId = :messageId ORDER BY createdAtEpochMs DESC")
     abstract suspend fun interpretationsForMessage(messageId: String): List<LlmInterpretationEntity>
 
+    /** Bulk form of [interpretationsForMessage] — avoids an N+1 scan over raw_sms. */
+    @Query("SELECT DISTINCT sourceMessageId FROM llm_interpretations")
+    abstract suspend fun interpretedMessageIds(): List<String>
+
     @Query("SELECT EXISTS(SELECT 1 FROM llm_interpretations WHERE responseHash = :hash)")
     abstract suspend fun interpretationExists(hash: String): Boolean
+
+    /**
+     * Messages whose scan outcome is terminal (either interpreted, or
+     * deliberately rejected/abandoned). Retryable failures are excluded so a
+     * transient provider outage is picked up again on the next pass.
+     */
+    @Query("SELECT DISTINCT sourceMessageId FROM llm_jobs WHERE status IN ('SUCCEEDED','TERMINAL_FAILED')")
+    abstract suspend fun settledJobMessageIds(): List<String>
+
+    @Query(
+        """UPDATE llm_jobs SET status = :status, lastErrorClass = :errorClass,
+           updatedAtEpochMs = :now WHERE jobIdentity = :jobIdentity"""
+    )
+    abstract suspend fun updateJobOutcome(jobIdentity: String, status: String, errorClass: String?, now: Long): Int
 
     // ---- cache ----
 

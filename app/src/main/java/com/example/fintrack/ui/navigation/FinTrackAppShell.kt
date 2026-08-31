@@ -13,6 +13,7 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -70,6 +71,7 @@ fun FinTrackAppShell(
     diagnosticsViewModel: com.example.fintrack.application.diagnostics.DiagnosticsViewModel? = null,
     llmConfigStore: com.example.fintrack.llm.LlmConfigStore? = null,
     llmProcessingViewModel: com.example.fintrack.application.enrichment.LlmProcessingViewModel? = null,
+    llmSettingsViewModel: com.example.fintrack.ui.settings.LlmSettingsViewModel? = null,
     manualEntryViewModel: com.example.fintrack.application.transactions.ManualEntryViewModel? = null,
     transactionDetailViewModel: com.example.fintrack.application.transactions.TransactionDetailViewModel? = null,
 ) {
@@ -246,9 +248,21 @@ fun FinTrackAppShell(
                     },
                     onNavigateToDiagnostics = { navController.navigate(Routes.DIAGNOSTICS) },
                     onNavigateToSmsConsent = { navController.navigate(Routes.SMS_CONSENT) },
+                    onNavigateToLlmSettings = { navController.navigate(Routes.LLM_SETTINGS) },
                     onRequestSmsPermission = onRequestSmsPermission,
                     llmProcessingViewModel = llmProcessingViewModel,
                 )
+            }
+            composable(Routes.LLM_SETTINGS) {
+                val vm = llmSettingsViewModel
+                if (vm != null) {
+                    com.example.fintrack.ui.settings.LlmSettingsScreen(
+                        viewModel = vm,
+                        onBack = { navController.popBackStack() },
+                    )
+                } else {
+                    PlaceholderScreen("AI interpretation settings")
+                }
             }
             composable(Routes.BACKUP_RESTORE) {
                 val bvm = backupViewModel
@@ -259,12 +273,14 @@ fun FinTrackAppShell(
                 }
             }
             composable(Routes.SMS_CONSENT) {
+                val llmProgress = llmProcessingViewModel?.progress?.collectAsState()?.value
                 com.example.fintrack.ui.sms.SmsConsentScreen(
                     state = smsConsentState,
                     onRequestPermission = onRequestSmsPermission,
                     onStartBackfill = { onStartSmsBackfill() },
                     onPauseBackfill = { onPauseSmsBackfill() },
                     onRevokeHandled = onSmsRevokeHandled,
+                    llmProgress = llmProgress,
                 )
             }
             composable(Routes.DIAGNOSTICS) {

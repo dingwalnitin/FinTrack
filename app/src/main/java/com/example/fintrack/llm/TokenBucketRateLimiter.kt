@@ -30,17 +30,23 @@ class TokenBucketRateLimiter(
      * pattern — use from a background coroutine, never from the UI thread).
      */
     suspend fun acquire() {
-        mutex.withLock {
-            refill()
-            while (tokens < 1.0) {
-                // Unlock while waiting so other coroutines can refill
-                val waitMs = ((1.0 - tokens) / tokensPerSecond * 1000).toLong().coerceAtLeast(50)
-                mutex.unlock()
-                delay(waitMs)
-                mutex.lock()
+        // Never manually unlock() inside withLock: if the coroutine is
+        // cancelled while waiting (e.g. LlmProcessingService.stopScan()) or
+        // another coroutine observes the lock in between, we would call
+        // unlock() on an unheld mutex -> IllegalStateException("Mutex is not
+        // locked"). Instead, compute the wait time under the lock, release it
+        // cleanly, and only then sleep. Cancellation during delay() then simply
+        // propagates normally.
+        while (true) {
+            val waitMs = mutex.withLock {
                 refill()
+                if (tokens >= 1.0) {
+                    tokens -= 1.0
+                    return
+                }
+                ((1.0 - tokens) / tokensPerSecond * 1000).toLong().coerceAtLeast(50)
             }
-            tokens -= 1.0
+            delay(waitMs)
         }
     }
 

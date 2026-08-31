@@ -148,6 +148,20 @@ class EnrichmentOrchestratorTest {
         override suspend fun interpretationsForMessage(messageId: String): List<LlmInterpretationEntity> =
             interpretations.filter { it.sourceMessageId == messageId }
 
+        override suspend fun interpretedMessageIds(): List<String> =
+            interpretations.map { it.sourceMessageId }.distinct()
+
+        override suspend fun settledJobMessageIds(): List<String> =
+            jobs.values.filter { it.status in TERMINAL_STATUSES }.map { it.sourceMessageId }.distinct()
+
+        override suspend fun updateJobOutcome(
+            jobIdentity: String, status: String, errorClass: String?, now: Long,
+        ): Int {
+            val job = jobs.values.firstOrNull { it.jobIdentity == jobIdentity } ?: return 0
+            jobs[job.id] = job.copy(status = status, lastErrorClass = errorClass, updatedAtEpochMs = now)
+            return 1
+        }
+
         override suspend fun interpretationExists(hash: String): Boolean =
             interpretations.any { it.responseHash == hash }
 
@@ -194,6 +208,10 @@ class EnrichmentOrchestratorTest {
             jobs.values.filter {
                 it.status in listOf(LlmJobStates.TERMINAL_FAILED, LlmJobStates.RETRYABLE_FAILED)
             }.sortedByDescending { it.updatedAtEpochMs }.take(limit)
+
+        private companion object {
+            val TERMINAL_STATUSES = setOf(LlmJobStates.SUCCEEDED, LlmJobStates.TERMINAL_FAILED)
+        }
     }
 
     private fun job(sourceId: String, now: Long) = LlmJobEntity(

@@ -34,6 +34,8 @@ object LlmResponseDecoder {
     sealed interface ValidationResult {
         data class Valid(val response: RawParsed) : ValidationResult
         data class Invalid(val errorClass: LlmErrorClass, val reason: String) : ValidationResult
+        /** Model asserts this SMS is not a completed financial transaction (OTP, promo, etc.). */
+        data class NonFinancial(val reason: String?) : ValidationResult
     }
 
     /** Parsed-but-unpersisted shape: exactly what [ParseResponse] needs minus metadata. */
@@ -43,6 +45,7 @@ object LlmResponseDecoder {
     )
 
     private val SUPPORTED_FIELDS = setOf(
+        "isFinancial", "reason",
         "amountMinor", "currencyCode", "direction", "accountToken", "rail",
         "counterpartyRaw", "counterpartyNormalized", "categorySuggestion",
         "transferTargetToken", "recurring", "emiDetail", "occurredAtEpochMs",
@@ -63,6 +66,12 @@ object LlmResponseDecoder {
                 LlmErrorClass.SCHEMA_VALIDATION_FAILED,
                 "unsupported fields: $unknown",
             )
+        }
+
+        // Model-asserted non-transaction: short-circuits before any of the
+        // otherwise-required transaction fields are checked.
+        if (root.has("isFinancial") && !root.isNull("isFinancial") && !root.optBoolean("isFinancial", true)) {
+            return ValidationResult.NonFinancial(optString(root, "reason"))
         }
 
         // ---- critical values ----

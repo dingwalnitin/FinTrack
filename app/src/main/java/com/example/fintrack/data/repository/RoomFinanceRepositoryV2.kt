@@ -41,18 +41,13 @@ class RoomFinanceRepositoryV2(private val dao: FinanceDaoV2) : FinanceRepository
     override suspend fun postTransaction(
         txn: FinanceRepositoryV2.TransactionRow,
         entry: FinanceRepositoryV2.LedgerEntryRow,
-    ): Boolean {
-        val inserted = dao.insertTransaction(txn.toEntity()) != -1L
-        if (inserted) {
-            dao.insertLedgerEntry(
-                LedgerEntryEntity(
-                    id = entry.id, transactionId = entry.transactionId, accountId = entry.accountId,
-                    direction = entry.direction, amountMinor = entry.amountMinor, currencyCode = entry.currencyCode,
-                )
-            )
-        }
-        return inserted
-    }
+    ): Boolean = dao.postTransaction(
+        txn.toEntity(),
+        LedgerEntryEntity(
+            id = entry.id, transactionId = entry.transactionId, accountId = entry.accountId,
+            direction = entry.direction, amountMinor = entry.amountMinor, currencyCode = entry.currencyCode,
+        ),
+    )
 
     override suspend fun addAccount(account: FinanceRepositoryV2.AccountRow): Boolean =
         dao.insertAccount(

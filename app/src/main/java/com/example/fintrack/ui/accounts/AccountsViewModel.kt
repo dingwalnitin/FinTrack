@@ -5,8 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.example.fintrack.domain.repository.FinanceRepositoryV2
 import com.example.fintrack.domain.service.BalanceCalculator
 import com.example.fintrack.domain.service.InstitutionAliasRegistry
-import com.example.fintrack.domain.model.AccountLifecycle
 import com.example.fintrack.domain.model.AccountType
+import com.example.fintrack.domain.model.AccountLifecycle
 import com.example.fintrack.domain.model.EntityId
 import com.example.fintrack.ui.common.UiState
 import kotlinx.coroutines.flow.SharingStarted
@@ -52,37 +52,6 @@ class AccountsViewModel(private val repo: FinanceRepositoryV2) : ViewModel() {
         }
         .catch { UiState.Error(it.message ?: "Failed to load accounts") }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UiState.Loading)
-
-    /** Manual add. Ownership fields are what the user entered — confirmed by definition. */
-    fun addAccount(
-        nickname: String, type: AccountType, currencyCode: String,
-        last4: String?, institution: String?, openingBalanceMinor: Long,
-    ) = viewModelScope.launch {
-        val id = EntityId.generate().value
-        val now = System.currentTimeMillis()
-        repo.addAccount(
-            FinanceRepositoryV2.AccountRow(
-                id = id,
-                name = nickname,
-                normalizedName = nickname.trim().lowercase(),
-                currencyCode = currencyCode,
-                accountType = type.name,
-                createdAtEpochMs = now,
-                lifecycle = AccountLifecycle.ACTIVE.name,
-                nickname = nickname,
-                last4 = last4?.takeIf { it.length == 4 && it.all(Char::isDigit) },
-                institutionName = institution?.trim()?.lowercase(),
-            )
-        )
-        if (openingBalanceMinor != 0L) {
-            repo.setOpeningBalance(
-                FinanceRepositoryV2.OpeningBalanceRow(
-                    id = EntityId.generate().value, accountId = id,
-                    amountMinor = openingBalanceMinor, currencyCode = currencyCode, asOfEpochMs = now,
-                )
-            )
-        }
-    }
 
     /**
      * Manually set the current balance of an account by recording a

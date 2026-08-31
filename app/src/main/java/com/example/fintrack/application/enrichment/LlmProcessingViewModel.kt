@@ -36,9 +36,10 @@ class LlmProcessingViewModel(
     }
 
     fun startScan(context: Context? = null) {
-        // Kick a backfill so any unread SMS land in raw_sms first; the LLM
-        // scan is idempotent and will pick up only newly captured rows (or
-        // everything if this is the first run).
+        // Kick a backfill so any unread SMS land in raw_sms. The backfill
+        // worker chains into SmsProcessingWorker when it finishes, and the
+        // service forces a follow-up pass if a scan is still in flight, so
+        // rows that land after this snapshot are never dropped.
         if (context != null) {
             try {
                 SmsIngestionScheduler.enqueueBackfill(context.applicationContext)

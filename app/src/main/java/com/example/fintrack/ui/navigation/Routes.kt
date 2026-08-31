@@ -27,6 +27,9 @@ object Routes {
     const val SETTINGS = "settings"
     const val SMS_CONSENT = "sms-consent"
 
+    /** Dedicated LLM (AI interpretation) settings — own screen, not inline. */
+    const val LLM_SETTINGS = "settings/llm"
+
     /** Parameterized deep link: account detail from a notification-free path. */
     const val ACCOUNT_DETAIL = "accounts/{accountId}"
 

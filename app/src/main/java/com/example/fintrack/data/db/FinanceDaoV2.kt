@@ -73,10 +73,12 @@ interface FinanceDaoV2 {
 
     /** Transactional money-changing write: transaction + its posting atomically. */
     @Transaction
-    suspend fun postTransaction(txn: TransactionEntity, entry: LedgerEntryEntity) {
-        if (insertTransaction(txn) != -1L) {
+    suspend fun postTransaction(txn: TransactionEntity, entry: LedgerEntryEntity): Boolean {
+        val inserted = insertTransaction(txn) != -1L
+        if (inserted) {
             insertLedgerEntry(entry)
         }
+        return inserted
     }
 
     // ---- Processing jobs (resumable background work) ----

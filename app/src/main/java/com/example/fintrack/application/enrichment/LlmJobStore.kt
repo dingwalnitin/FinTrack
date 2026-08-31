@@ -121,6 +121,66 @@ class LlmJobStore(private val dao: LlmDao) {
     suspend fun interpretationsForMessage(messageId: String): List<LlmInterpretationEntity> =
         dao.interpretationsForMessage(messageId)
 
+    // ---- scan outcomes ----
+
+    /** Stable job identity for the on-demand scan pipeline. */
+    fun scanIdentity(sourceMessageId: String): String = "scan:$sourceMessageId"
+
+    /**
+     * Every message the scan must not look at again: already interpreted, or
+     * carrying a terminal scan outcome. One query per set instead of one per
+     * row. RETRYABLE_FAILED is deliberately absent so transient provider
+     * failures are retried on the next pass.
+     */
+    suspend fun settledMessageIds(): Set<String> =
+        (dao.interpretedMessageIds() + dao.settledJobMessageIds()).toSet()
+
+    /**
+     * Record the terminal (or retryable) outcome of scanning one message so a
+     * later pass does not redo the LLM work. Insert-then-update because the
+     * unique jobIdentity makes the insert a no-op once a row already exists.
+     */
+    suspend fun recordScanOutcome(
+        sourceMessageId: String,
+        senderHash: String?,
+        providerId: String,
+        status: String,
+        errorClass: String?,
+        nowEpochMs: Long,
+    ) {
+        val identity = scanIdentity(sourceMessageId)
+        dao.insertJob(
+            LlmJobEntity(
+                id = java.util.UUID.randomUUID().toString(),
+                jobIdentity = identity,
+                sourceMessageId = sourceMessageId,
+                senderHash = senderHash,
+                priority = 0,
+                status = status,
+                attempts = 1,
+                maxAttempts = 1,
+                nextRetryAtEpochMs = nowEpochMs,
+                claimedAtEpochMs = null,
+                claimedByWorker = null,
+                promptVersion = PROMPT_VERSION,
+                schemaVersion = SCHEMA_VERSION,
+                providerId = providerId,
+                lastErrorClass = errorClass,
+                createdAtEpochMs = nowEpochMs,
+                updatedAtEpochMs = nowEpochMs,
+            )
+        )
+        dao.updateJobOutcome(identity, status, errorClass, nowEpochMs)
+    }
+
+    // ---- metrics ----
+
+    suspend fun metric(name: String): Long =
+        dao.allMetrics().firstOrNull { it.metricName == name }?.value ?: 0L
+
+    suspend fun setMetric(name: String, value: Long, nowEpochMs: Long) =
+        dao.setMetric(name, value, nowEpochMs)
+
     // ---- cache ----
 
     suspend fun cachedResponse(cacheKey: String): LlmResponseCacheEntity? = dao.cacheEntry(cacheKey)

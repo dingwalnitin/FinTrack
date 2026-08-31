@@ -14,8 +14,10 @@ import kotlinx.coroutines.flow.Flow
 interface SmsRepository {
 
     /**
-     * Persist a single raw SMS (e.g., from the receiver). Returns true when the
-     * row was newly inserted, false when it was a duplicate.
+     * Persist a single raw SMS (e.g., from the receiver). Returns the new
+     * `raw_sms` id when the row was newly inserted, or null when it was a
+     * duplicate. The id lets the caller ask for that message to be processed
+     * ahead of any historical backlog.
      */
     suspend fun captureRaw(
         providerId: Long,
@@ -23,7 +25,7 @@ interface SmsRepository {
         body: String,
         timestampEpochMs: Long,
         sourceKind: String,
-    ): Boolean
+    ): String?
 
     /**
      * Persist a batch durably and atomically advance the cursor. Processed rows

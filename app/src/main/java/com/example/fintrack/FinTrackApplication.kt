@@ -136,7 +136,12 @@ class FinTrackApplication : Application() {
 
     /** OpenAI-compatible Chat Completions provider built from saved config. */
     val chatCompletionsProvider: com.example.fintrack.llm.ChatCompletionsProvider by lazy {
-        com.example.fintrack.llm.ChatCompletionsProvider(llmConfigStore.load())
+        // Pass a live config provider rather than a snapshot so edits to the
+        // base URL / API key / model in Settings take effect on the very next
+        // request (the same shared instance is reused for every LLM call).
+        com.example.fintrack.llm.ChatCompletionsProvider(
+            configProvider = { llmConfigStore.load() },
+        )
     }
 
     /**
@@ -154,6 +159,12 @@ class FinTrackApplication : Application() {
         )
     }
 
+    val llmDiscoveryService: com.example.fintrack.application.enrichment.LlmDiscoveryService by lazy {
+        com.example.fintrack.application.enrichment.LlmDiscoveryService(
+            com.example.fintrack.application.enrichment.FinanceRepositoryLlmDiscoverySink(financeRepository),
+        )
+    }
+
     /**
      * On-demand "process ALL SMS through the LLM" service with exponential
      * backoff + progress StateFlow. Triggered from Settings.
@@ -163,6 +174,7 @@ class FinTrackApplication : Application() {
             smsDao = database.smsDao(),
             llmDao = database.llmDao(),
             provider = rateLimitedLlmProvider,
+            discoveryService = llmDiscoveryService,
         )
     }
 

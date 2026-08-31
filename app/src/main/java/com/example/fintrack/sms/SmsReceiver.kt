@@ -46,28 +46,30 @@ class SmsReceiver : BroadcastReceiver() {
             val repo = app.smsRepository
 
             // Bounded synchronous persist; raw writes are short and idempotent.
-            val captured = runBlocking(Dispatchers.IO) {
-                var any = false
+            val capturedIds = runBlocking(Dispatchers.IO) {
+                val ids = mutableListOf<String>()
                 for (m in messages) {
                     val providerId = inferProviderId(m)
-                    val persisted = repo.captureRaw(
+                    repo.captureRaw(
                         providerId = providerId,
                         sender = m.displayOriginatingAddress,
                         body = m.displayMessageBody.orEmpty(),
                         timestampEpochMs = if (m.timestampMillis > 0) m.timestampMillis else System.currentTimeMillis(),
                         sourceKind = SmsIngestionPolicy.SOURCE_KIND_SMS_RECEIVED,
-                    )
-                    any = any or persisted
+                    )?.let(ids::add)
                 }
-                any
+                ids
             }
 
             // Kick durable processing for any newly captured message.
-            if (captured) {
+            if (capturedIds.isNotEmpty()) {
                 val pendingResult = goAsync()
                 CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
                     try {
-                        SmsIngestionScheduler.enqueueSmsProcessing(context.applicationContext)
+                        SmsIngestionScheduler.enqueueSmsProcessing(
+                            context.applicationContext,
+                            triggerMessageIds = capturedIds,
+                        )
                     } finally {
                         pendingResult.finish()
                     }

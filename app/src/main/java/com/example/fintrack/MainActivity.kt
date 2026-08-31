@@ -86,6 +86,11 @@ class MainActivity : ComponentActivity() {
             service = app.llmProcessingService,
         )
 
+        // Dedicated LLM settings screen: config + "Test connection" probe.
+        val llmSettingsVM = com.example.fintrack.ui.settings.LlmSettingsViewModel(
+            store = llmConfigStore,
+        )
+
         // P11 #3/#6: manual entry + transaction detail (previously unreachable — now wired into the shell).
         val manualEntryVM = com.example.fintrack.application.transactions.ManualEntryViewModel(
             service = app.manualEntryService,
@@ -123,6 +128,7 @@ class MainActivity : ComponentActivity() {
                         diagnosticsViewModel = diagnosticsVM,
                         llmConfigStore = llmConfigStore,
                         llmProcessingViewModel = llmProcessingVM,
+                        llmSettingsViewModel = llmSettingsVM,
                         manualEntryViewModel = manualEntryVM,
                         transactionDetailViewModel = transactionDetailVM,
                     )

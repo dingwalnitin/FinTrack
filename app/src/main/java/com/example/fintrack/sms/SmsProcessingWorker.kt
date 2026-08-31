@@ -21,12 +21,18 @@ class SmsProcessingWorker(
     override suspend fun doWork(): Result {
         val app = applicationContext as FinTrackApplication
         val repo = app.smsRepository
+        val triggerIds = inputData
+            .getStringArray(SmsIngestionScheduler.KEY_TRIGGER_MESSAGE_IDS)
+            ?.toSet()
+            .orEmpty()
         return try {
             repo.markStatus("RUNNING")
-            // Run the captured SMS (including any newly arrived) through the
-            // LLM. The service is idempotent — already-interpreted rows are
-            // skipped, so this is safe to run on every broadcast.
-            app.llmProcessingService.startScan()
+            // The service is idempotent — messages with a durable outcome are
+            // skipped — and guarantees a pass that observes everything captured
+            // before this call, so a scan already in flight cannot swallow the
+            // message that triggered us. Trigger ids are triaged one-shot so a
+            // live SMS is not queued behind a historical backfill.
+            app.llmProcessingService.startScanAndWait(directMessageIds = triggerIds)
             repo.markStatus("IDLE")
             Result.success()
         } catch (t: Throwable) {

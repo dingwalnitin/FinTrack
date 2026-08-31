@@ -237,6 +237,12 @@ class EnrichmentOrchestrator(
                 )
                 bumpMetrics(succeeded = 1)
             }
+            is LlmResponseDecoder.ValidationResult.NonFinancial -> {
+                // Not a transaction (OTP, promo, etc.) — settle the job without
+                // persisting an interpretation or caching the raw response.
+                jobStore.markSucceeded(job, System.currentTimeMillis())
+                bumpMetrics(succeeded = 1)
+            }
         }
     }
 

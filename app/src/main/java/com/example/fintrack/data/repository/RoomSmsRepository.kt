@@ -34,12 +34,12 @@ class RoomSmsRepository(
         body: String,
         timestampEpochMs: Long,
         sourceKind: String,
-    ): Boolean {
+    ): String? {
         val id = UUID.randomUUID().toString()
         val hash = SmsIngestionPolicy.contentHash(sender, body, timestampEpochMs)
         // De-dup by contentHash to handle providerId churn across rebuilds.
         val existing = dao.findByProviderId(providerId) ?: dao.findByContentHash(hash)
-        if (existing != null) return false
+        if (existing != null) return null
 
         val inserted = dao.insertRawBatch(
             listOf(
@@ -71,7 +71,7 @@ class RoomSmsRepository(
                 )
             )
         }
-        return wasInserted
+        return if (wasInserted) id else null
     }
 
     override suspend fun commitBatch(

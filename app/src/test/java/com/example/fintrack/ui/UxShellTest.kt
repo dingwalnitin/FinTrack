@@ -43,9 +43,8 @@ class UxShellTest {
     }
 
     @Test
-    fun `settings default to safe values - AI off and exports redacted`() {
+    fun `settings default to safe values - exports redacted`() {
         val defaults = SettingsUiModel()
-        assertFalse(defaults.aiInterpretationEnabled)
         assertFalse(defaults.exportIncludeRawEvidence)
         assertTrue(defaults.autoCategorizationEnabled)
     }

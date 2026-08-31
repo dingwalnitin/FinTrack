@@ -10,6 +10,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -31,8 +32,8 @@ class RoomSmsRepositoryTest {
     @Test
     fun `captureRaw is idempotent on duplicate providerId`() = runTest {
         val (repo, dao) = repo()
-        assertTrue(repo.captureRaw(42, "HDFC", "INR 100", 1_000L, "SMS_RECEIVED"))
-        assertFalse(repo.captureRaw(42, "HDFC", "INR 100", 1_000L, "SMS_RECEIVED"))
+        assertNotNull(repo.captureRaw(42, "HDFC", "INR 100", 1_000L, "SMS_RECEIVED"))
+        assertNull(repo.captureRaw(42, "HDFC", "INR 100", 1_000L, "SMS_RECEIVED"))
         assertEquals(1L, dao.rawCount())
     }
 
@@ -108,8 +109,8 @@ class RoomSmsRepositoryTest {
     @Test
     fun `duplicate broadcasts with the same content are deduped by contentHash`() = runTest {
         val (repo, dao) = repo()
-        assertTrue(repo.captureRaw(1, "HDFC", "INR 100", 100L, "SMS_RECEIVED"))
-        assertFalse(repo.captureRaw(999, "HDFC", "INR 100", 100L, "SMS_RECEIVED"))
+        assertNotNull(repo.captureRaw(1, "HDFC", "INR 100", 100L, "SMS_RECEIVED"))
+        assertNull(repo.captureRaw(999, "HDFC", "INR 100", 100L, "SMS_RECEIVED"))
         assertEquals(1L, dao.rawCount())
     }
 

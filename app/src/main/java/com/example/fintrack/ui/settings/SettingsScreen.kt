@@ -19,7 +19,6 @@ import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -50,17 +49,17 @@ import com.example.fintrack.application.enrichment.LlmProcessingViewModel
 import com.example.fintrack.llm.LlmConfig
 import com.example.fintrack.ui.common.FinTrackCard
 import com.example.fintrack.ui.common.IconBadge
+import com.example.fintrack.ui.common.LlmProgressSummary
 import com.example.fintrack.ui.theme.Palette
 
 /**
  * Settings shell. Sections only — no API keys, tokens or secrets are ever
  * displayed here. Data-lifecycle entry points keep exports on-device.
  *
- * Safe defaults: AI interpretation OFF until the user opts in; exports
- * redact raw evidence by default.
+ * AI interpretation is always on (default mode) — no toggle needed.
+ * Safe defaults: exports redact raw evidence by default.
  */
 data class SettingsUiModel(
-    val aiInterpretationEnabled: Boolean = false,   // safe default: off
     val exportIncludeRawEvidence: Boolean = false,  // safe default: redacted
     val autoCategorizationEnabled: Boolean = true,
     val llmConfig: LlmConfig = LlmConfig(),
@@ -72,6 +71,7 @@ fun SettingsScreen(
     onChanged: (SettingsUiModel) -> Unit = {},
     onNavigateToDiagnostics: () -> Unit = {},
     onNavigateToSmsConsent: () -> Unit = {},
+    onNavigateToLlmSettings: () -> Unit = {},
     onRequestSmsPermission: () -> Unit = {},
     llmProcessingViewModel: LlmProcessingViewModel? = null,
 ) {
@@ -122,21 +122,18 @@ fun SettingsScreen(
         item {
             FinTrackCard {
                 CommonSectionHeader(stringResource(R.string.settings_llm_controls))
-                ToggleRow(
-                    label = stringResource(R.string.settings_llm_controls),
-                    icon = Icons.Filled.AutoAwesome,
-                    checked = ui.aiInterpretationEnabled,
-                ) { ui = ui.copy(aiInterpretationEnabled = it); onChanged(ui) }
                 Text(
-                    "AI interpretation calls an OpenAI-compatible Chat Completions endpoint. " +
-                        "Raw SMS stays on this device; only normalized text is sent.",
+                    "AI interpretation is always enabled — it processes your SMS through the LLM " +
+                        "to extract financial transactions. The SMS body text (unmodified) and a hashed " +
+                        "sender identifier are sent to your configured endpoint; nothing else leaves this device.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
+                    modifier = Modifier.padding(bottom = 8.dp),
                 )
-                LlmConfigFields(
-                    config = ui.llmConfig,
-                    onConfigChanged = { cfg -> ui = ui.copy(llmConfig = cfg); onChanged(ui) },
+                SettingsLink(
+                    label = "Configure AI (model & connection)",
+                    icon = Icons.Filled.AutoAwesome,
+                    onClick = onNavigateToLlmSettings,
                 )
                 llmProcessingViewModel?.let { vm ->
                     val progress by vm.progress.collectAsState()
@@ -227,18 +224,7 @@ private fun LlmProcessingBar(
             }
         }
         if (progress.running || progress.total > 0) {
-            Text(
-                "Processed ${progress.processed} / ${progress.total} SMS " +
-                    "(${progress.succeeded} succeeded, ${progress.failed} failed)",
-                style = MaterialTheme.typography.bodySmall,
-            )
-            LinearProgressIndicator(
-                progress = {
-                    if (progress.total > 0) (progress.processed.toFloat() / progress.total.toFloat()).coerceIn(0f, 1f)
-                    else 0f
-                },
-                modifier = Modifier.fillMaxWidth(),
-            )
+            LlmProgressSummary(progress)
         }
         if (progress.status == "COMPLETE") {
             Text("All SMS processed.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
@@ -251,74 +237,6 @@ private fun LlmProcessingBar(
         }
         progress.lastError?.let { err ->
             Text("Error: $err", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-        }
-    }
-}
-
-/** Editable fields for the Chat Completions API configuration. */
-@Composable
-private fun LlmConfigFields(
-    config: LlmConfig,
-    onConfigChanged: (LlmConfig) -> Unit,
-) {
-    var baseUrl by remember { mutableStateOf(config.baseUrl) }
-    var apiKey by remember { mutableStateOf(config.apiKey) }
-    var modelId by remember { mutableStateOf(config.modelId) }
-    var showKey by remember { mutableStateOf(false) }
-    var saved by remember { mutableStateOf(false) }
-
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedTextField(
-            value = baseUrl,
-            onValueChange = { baseUrl = it; saved = false },
-            label = { Text("Base URL") },
-            placeholder = { Text("https://api.openai.com") },
-            supportingText = { Text("e.g. https://api.openai.com or https://your-gateway.example") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        OutlinedTextField(
-            value = apiKey,
-            onValueChange = { apiKey = it; saved = false },
-            label = { Text("API key") },
-            placeholder = { Text("sk-…") },
-            singleLine = true,
-            visualTransformation = if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
-            trailingIcon = {
-                Text(
-                    if (showKey) "Hide" else "Show",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier
-                        .clickable { showKey = !showKey }
-                        .padding(8.dp),
-                )
-            },
-            modifier = Modifier.fillMaxWidth(),
-        )
-        OutlinedTextField(
-            value = modelId,
-            onValueChange = { modelId = it; saved = false },
-            label = { Text("Model ID") },
-            placeholder = { Text("gpt-4o-mini") },
-            supportingText = { Text("Any model id supported by your endpoint, e.g. gpt-4o-mini, llama-3.3-70b") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Button(
-            onClick = {
-                onConfigChanged(LlmConfig(baseUrl.trim(), apiKey.trim(), modelId.trim()))
-                saved = true
-            },
-            enabled = baseUrl.isNotBlank() && apiKey.isNotBlank() && modelId.isNotBlank(),
-            modifier = Modifier.fillMaxWidth(),
-        ) { Text("Save API configuration") }
-        if (saved) {
-            Text(
-                "Saved.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.primary,
-            )
         }
     }
 }

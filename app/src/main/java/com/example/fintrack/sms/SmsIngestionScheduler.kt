@@ -3,6 +3,7 @@ package com.example.fintrack.sms
 import android.content.Context
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
+import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
@@ -18,10 +19,18 @@ object SmsIngestionScheduler {
     const val UNIQUE_PROCESSING = "sms-processing"
     const val UNIQUE_BACKFILL = "sms-backfill"
 
-    fun enqueueSmsProcessing(context: Context) {
+    /** Input key naming the messages that must be triaged one-shot, not batched. */
+    const val KEY_TRIGGER_MESSAGE_IDS = "triggerMessageIds"
+
+    fun enqueueSmsProcessing(context: Context, triggerMessageIds: List<String> = emptyList()) {
         val request = OneTimeWorkRequestBuilder<SmsProcessingWorker>()
             .setConstraints(Constraints.Builder().build())
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
+            .setInputData(
+                Data.Builder()
+                    .putStringArray(KEY_TRIGGER_MESSAGE_IDS, triggerMessageIds.toTypedArray())
+                    .build()
+            )
             .build()
         WorkManager.getInstance(context.applicationContext)
             .enqueueUniqueWork(UNIQUE_PROCESSING, ExistingWorkPolicy.APPEND_OR_REPLACE, request)

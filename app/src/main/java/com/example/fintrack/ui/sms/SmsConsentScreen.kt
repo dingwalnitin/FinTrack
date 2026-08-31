@@ -21,6 +21,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.example.fintrack.domain.repository.IngestionProgress
+import com.example.fintrack.application.enrichment.LlmProcessingService
+import com.example.fintrack.ui.common.LlmProgressSummary
 
 /**
  * Consent / progress screen for SMS evidence acquisition.
@@ -43,6 +45,7 @@ fun SmsConsentScreen(
     onStartBackfill: () -> Unit,
     onPauseBackfill: () -> Unit,
     onRevokeHandled: () -> Unit,
+    llmProgress: LlmProcessingService.Progress? = null,
 ) {
     Column(
         Modifier
@@ -75,6 +78,15 @@ fun SmsConsentScreen(
         )
 
         Spacer(Modifier.padding(top = 8.dp))
+
+        if (llmProgress != null && (llmProgress.running || llmProgress.total > 0)) {
+            HorizontalDivider()
+            Text("AI processing", style = MaterialTheme.typography.titleMedium)
+            LlmProgressSummary(llmProgress)
+            llmProgress.lastError?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+            }
+        }
 
         when (state.phase) {
             SmsConsentPhase.NEEDS_CONSENT -> {
