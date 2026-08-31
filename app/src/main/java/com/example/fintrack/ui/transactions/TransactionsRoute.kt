@@ -71,8 +71,8 @@ private fun TransactionsList(all: List<Transaction>, onOpenTransaction: (String)
                 (txn.counterparty?.contains(query, ignoreCase = true) == true)
             val matchesFilter = when (filter) {
                 TxnFilter.ALL -> true
-                TxnFilter.INCOME -> txn.amount.minorUnits >= 0
-                TxnFilter.EXPENSE -> txn.amount.minorUnits < 0
+                TxnFilter.INCOME -> !txn.directionDebit
+                TxnFilter.EXPENSE -> txn.directionDebit
             }
             matchesQuery && matchesFilter
         }.sortedByDescending { it.occurredAt }
@@ -142,9 +142,9 @@ private fun TransactionsList(all: List<Transaction>, onOpenTransaction: (String)
                 MoneyRow(
                     MoneyRowData(
                         title = txn.counterparty ?: "Transaction",
-                        amountMinor = txn.amount.minorUnits,
+                        amountMinor = if (txn.directionDebit) -txn.amount.minorUnits else txn.amount.minorUnits,
                         currencyCode = txn.amount.currencyCode,
-                        isDebit = txn.amount.minorUnits < 0,
+                        isDebit = txn.directionDebit,
                         subtitle = timeLabel(txn.occurredAt, zone),
                     ),
                     onClick = { onOpenTransaction(txn.id.value) },

@@ -1,7 +1,8 @@
 package com.example.fintrack.ui.transactions
 
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import com.example.fintrack.TestActivity
 import androidx.compose.ui.test.onNodeWithText
 import com.example.fintrack.application.transactions.TransferCandidatesViewModel
 import com.example.fintrack.domain.service.TransferCandidateMatcher
@@ -18,7 +19,7 @@ import org.junit.Test
 class TransferCandidatesScreenTest {
 
     @get:Rule
-    val composeTestRule = createComposeRule()
+    val composeTestRule = createAndroidComposeRule<TestActivity>()
 
     @Test
     fun transferCandidates_emptyStateShowsMessage() {

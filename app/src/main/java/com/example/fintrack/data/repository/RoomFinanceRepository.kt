@@ -39,6 +39,9 @@ fun TransactionEntity.toDomain(): Transaction = Transaction(
             capturedAt = Instant.ofEpochMilli(correctionCapturedAtEpochMs ?: 0L),
         )
     },
+    // Sign is encoded in the semantic kind (amountMinor is always absolute);
+    // EXPENSE/FEE/TRANSFER/CASH_MOVE are outflows (debit).
+    directionDebit = kind == "EXPENSE" || kind == "FEE" || kind == "TRANSFER" || kind == "CASH_MOVE",
 )
 
 private typealias Instant = java.time.Instant

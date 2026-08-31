@@ -118,7 +118,7 @@ class LlmDaoIntegrationTest {
     )
 
     @Test
-    fun `insert and claim a job`() = runTest {
+    fun insertAndClaimAJob() = runTest {
         val dao = db.llmDao()
         val j = job()
         dao.insertJob(j)
@@ -131,7 +131,7 @@ class LlmDaoIntegrationTest {
     }
 
     @Test
-    fun `claiming a job a second time returns null (CAS guards)`() = runTest {
+    fun claimingAJobASecondTimeReturnsNullCasGuards() = runTest {
         val dao = db.llmDao()
         val j = job()
         dao.insertJob(j)
@@ -144,7 +144,7 @@ class LlmDaoIntegrationTest {
     }
 
     @Test
-    fun `expired lease can be reclaimed by another worker`() = runTest {
+    fun expiredLeaseCanBeReclaimedByAnotherWorker() = runTest {
         val dao = db.llmDao()
         val j = job()
         dao.insertJob(j)
@@ -160,7 +160,7 @@ class LlmDaoIntegrationTest {
     }
 
     @Test
-    fun `multiple jobs are claimed in priority order`() = runTest {
+    fun multipleJobsAreClaimedInPriorityOrder() = runTest {
         val dao = db.llmDao()
         val high = job(id = "high", jobIdentity = "hi", priority = 0, createdAt = now)
         val low = job(id = "low", jobIdentity = "lo", priority = 10, createdAt = now)
@@ -175,7 +175,7 @@ class LlmDaoIntegrationTest {
     }
 
     @Test
-    fun `job identity unique index prevents duplicates`() = runTest {
+    fun jobIdentityUniqueIndexPreventsDuplicates() = runTest {
         val dao = db.llmDao()
         val j = job(id = "a", jobIdentity = "same-identity")
         val dup = job(id = "b", jobIdentity = "same-identity")
@@ -186,7 +186,7 @@ class LlmDaoIntegrationTest {
     }
 
     @Test
-    fun `insert and retrieve interpretation`() = runTest {
+    fun insertAndRetrieveInterpretation() = runTest {
         val dao = db.llmDao()
         val i = interpret(id = "i1", sourceMessageId = "sms-1")
         dao.insertInterpretation(i)
@@ -197,7 +197,7 @@ class LlmDaoIntegrationTest {
     }
 
     @Test
-    fun `interpretation response hash unique index prevents duplicates`() = runTest {
+    fun interpretationResponseHashUniqueIndexPreventsDuplicates() = runTest {
         val dao = db.llmDao()
         val i1 = interpret(id = "a", sourceMessageId = "sms-1", responseHash = "same-hash")
         val i2 = interpret(id = "b", sourceMessageId = "sms-2", responseHash = "same-hash")
@@ -208,7 +208,7 @@ class LlmDaoIntegrationTest {
     }
 
     @Test
-    fun `update job outcome to succeeded`() = runTest {
+    fun updateJobOutcomeToSucceeded() = runTest {
         val dao = db.llmDao()
         val j = job()
         dao.insertJob(j)
@@ -232,7 +232,7 @@ class LlmDaoIntegrationTest {
     }
 
     @Test
-    fun `report failure does not advance beyond retryable failed`() = runTest {
+    fun reportFailureDoesNotAdvanceBeyondRetryableFailed() = runTest {
         val dao = db.llmDao()
         val j = job()
         dao.insertJob(j)
@@ -251,7 +251,7 @@ class LlmDaoIntegrationTest {
     }
 
     @Test
-    fun `claimNextDueJob respects nextRetryAtEpochMs`() = runTest {
+    fun claimNextDueJobRespectsNextRetryAtEpochMs() = runTest {
         val dao = db.llmDao()
         // Not due yet — nextRetryAt is in the future.
         val j = job(id = "future", jobIdentity = "future", nextRetryAtEpochMs = now + 60_000)

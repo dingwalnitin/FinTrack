@@ -33,6 +33,8 @@ data class Transaction(
     val state: LifecycleState,
     val provenance: Provenance,
     val correctionOrigin: Provenance? = null,
+    /** True when money leaves the account (EXPENSE/FEE/TRANSFER/CASH_MOVE); false for INCOME/REFUND. */
+    val directionDebit: Boolean = true,
 )
 
 enum class PostingDirection { DEBIT, CREDIT }

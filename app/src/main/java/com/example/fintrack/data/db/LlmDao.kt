@@ -36,7 +36,7 @@ abstract class LlmDao : LlmSchedulerDao {
      */
     @Transaction
     open suspend fun claimNextDueJob(workerId: String, nowEpochMs: Long, leaseMs: Long): LlmJobEntity? {
-        val candidate = queryClaimable(nowEpochMs, limit = 1).firstOrNull() ?: return null
+        val candidate = queryClaimable(nowEpochMs, leaseMs, limit = 1).firstOrNull() ?: return null
         val claimed = candidate.copy(
             status = LlmJobStates.CLAIMED,
             claimedAtEpochMs = nowEpochMs,

@@ -1,7 +1,8 @@
 package com.example.fintrack.ui.diagnostics
 
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import com.example.fintrack.TestActivity
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performScrollTo
 import androidx.room.Room
@@ -26,7 +27,7 @@ import org.junit.Test
 class DiagnosticsScreenTest {
 
     @get:Rule
-    val composeTestRule = createComposeRule()
+    val composeTestRule = createAndroidComposeRule<TestActivity>()
 
     private lateinit var db: FinTrackDatabaseV2
 
