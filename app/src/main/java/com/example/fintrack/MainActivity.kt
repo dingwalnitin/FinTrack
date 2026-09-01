@@ -101,6 +101,13 @@ class MainActivity : ComponentActivity() {
             daoV2 = app.database.financeDaoV2(),
         )
 
+        // Stage 13 (F): SMS review — passed/failed/pending list + manual re-run.
+        val smsReviewVM = com.example.fintrack.application.review.SmsReviewViewModel(
+            smsDao = app.database.smsDao(),
+            llmDao = app.database.llmDao(),
+            reviewService = app.smsReviewService,
+        )
+
         setContent {
             FinTrackTheme {
                 Surface {
@@ -131,6 +138,7 @@ class MainActivity : ComponentActivity() {
                         llmSettingsViewModel = llmSettingsVM,
                         manualEntryViewModel = manualEntryVM,
                         transactionDetailViewModel = transactionDetailVM,
+                        smsReviewViewModel = smsReviewVM,
                     )
                 }
             }

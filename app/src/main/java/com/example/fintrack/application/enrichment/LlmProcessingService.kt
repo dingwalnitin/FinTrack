@@ -533,6 +533,7 @@ class LlmProcessingService(
                                 latencyMs = latencyMs,
                                 tokensPrompt = estimateTokens(activePrompt),
                                 tokensCompletion = estimateTokens(raw),
+                                rawLlmJson = raw,   // Stage 13 (D)
                             )
                             recordOutcome(row, LlmJobStates.SUCCEEDED, null)
                             true
@@ -596,6 +597,7 @@ class LlmProcessingService(
         latencyMs: Long,
         tokensPrompt: Int,
         tokensCompletion: Int,
+        rawLlmJson: String? = null,   // Stage 13 (D)
     ) {
         val i = response.interpretation
         val now = System.currentTimeMillis()
@@ -638,6 +640,7 @@ class LlmProcessingService(
                 tokensCompletion = tokensCompletion,
                 fromCache = false,
                 createdAtEpochMs = now,
+                rawLlmJson = rawLlmJson,   // Stage 13 (D)
             )
         )
     }

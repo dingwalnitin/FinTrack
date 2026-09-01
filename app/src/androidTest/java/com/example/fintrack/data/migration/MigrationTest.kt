@@ -6,6 +6,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.example.fintrack.data.db.FinTrackDatabaseV2
 import com.example.fintrack.data.db.migration.Migrations
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -735,6 +736,95 @@ class MigrationTest {
             db.query("SELECT state FROM app_lock_state WHERE id = 1").use { c ->
                 assertTrue(c.moveToFirst()); assertEquals("UNLOCKED", c.getString(0))
             }
+        }
+    }
+
+    /**
+     * v11 -> v12 (Stage 13, A + D): additive tables payee_category_rules,
+     * transaction_evidence and nullable llm_interpretations.rawLlmJson column.
+     */
+    @Test
+    fun migrate11To12_addsPayeeRulesAndEvidenceTables_preservesData() {
+        helper.createDatabase(TEST_DB, 11).use { db ->
+            // Seed a v11 interpretation row (no rawLlmJson column).
+            db.execSQL(
+                """INSERT INTO llm_interpretations (id, sourceMessageId, responseHash,
+                   promptVersion, schemaVersion, providerId, modelId,
+                   amountMinor, currencyCode, direction,
+                   evidenceExplanationsJson, latencyMs, tokensPrompt, tokensCompletion,
+                   fromCache, createdAtEpochMs)
+                   VALUES ('i1', 'r1', 'rh-1', 'enrich-prompt-v2', 'enrich-schema-v1',
+                   'fake', 'm1', 25000, 'INR', 'DEBIT', '{}', 100, 50, 20, 0, 1000)"""
+            )
+        }
+
+        helper.runMigrationsAndValidate(TEST_DB, 12, true, com.example.fintrack.data.db.migration.MIGRATION_11_12).use { db ->
+            // Existing v11 row survived.
+            db.query("SELECT id, rawLlmJson FROM llm_interpretations WHERE id = 'i1'").use { c ->
+                assertTrue(c.moveToFirst())
+                assertEquals("i1", c.getString(0))
+                assertNull("rawLlmJson must be null for pre-v12 rows", c.getString(1))
+            }
+
+            // rawLlmJson can be set on new rows.
+            db.execSQL(
+                """INSERT INTO llm_interpretations (id, sourceMessageId, responseHash,
+                   promptVersion, schemaVersion, providerId, modelId,
+                   amountMinor, currencyCode, direction,
+                   evidenceExplanationsJson, latencyMs, tokensPrompt, tokensCompletion,
+                   fromCache, createdAtEpochMs, rawLlmJson)
+                   VALUES ('i2', 'r2', 'rh-2', 'enrich-prompt-v2', 'enrich-schema-v1',
+                   'fake', 'm1', 50000, 'INR', 'CREDIT', '{}', 100, 50, 20, 0, 1000, '{"test":true}')"""
+            )
+            db.query("SELECT rawLlmJson FROM llm_interpretations WHERE id = 'i2'").use { c ->
+                assertTrue(c.moveToFirst())
+                assertEquals("""{"test":true}""", c.getString(0))
+            }
+
+            // A: payee_category_rules accepts rows.
+            db.execSQL(
+                """INSERT INTO payee_category_rules (id, payeeIdentityHash, payeeName, vpa,
+                   categoryId, sourceKind, sourceVersion, createdAtEpochMs, updatedAtEpochMs)
+                   VALUES ('pr1', 'abc123', 'Swiggy', 'swiggy@ybl',
+                   'cat-food', 'USER_SET', 'rule-v1', 1000, 1000)"""
+            )
+            // Unique payeeIdentityHash enforced.
+            var threw = false
+            try {
+                db.execSQL(
+                    """INSERT INTO payee_category_rules (id, payeeIdentityHash, payeeName, vpa,
+                       categoryId, sourceKind, sourceVersion, createdAtEpochMs, updatedAtEpochMs)
+                       VALUES ('pr2', 'abc123', 'Swiggy', 'swiggy@ybl',
+                       'cat-food', 'USER_SET', 'rule-v1', 1000, 1000)"""
+                )
+            } catch (e: Exception) {
+                threw = true
+            }
+            assertTrue("duplicate payeeIdentityHash must be rejected", threw)
+
+            // D: transaction_evidence accepts rows.
+            db.execSQL(
+                """INSERT INTO transaction_evidence (id, transactionId, sourceMessageId,
+                   rawLlmJson, createdAtEpochMs)
+                   VALUES ('te1', 'txn1', 'r1', '{"raw":true}', 1000)"""
+            )
+            db.query("SELECT rawLlmJson FROM transaction_evidence WHERE transactionId = 'txn1'").use { c ->
+                assertTrue(c.moveToFirst())
+                assertEquals("""{"raw":true}""", c.getString(0))
+            }
+
+            // Unique (transactionId, sourceMessageId) enforced.
+            threw = false
+            try {
+                db.execSQL(
+                    """INSERT INTO transaction_evidence (id, transactionId, sourceMessageId,
+                       rawLlmJson, createdAtEpochMs)
+                       VALUES ('te2', 'txn1', 'r1', '{"raw":false}', 1000)"""
+                )
+            } catch (e: Exception) {
+                threw = true
+            }
+            assertTrue("duplicate (transactionId, sourceMessageId) must be rejected", threw)
         }
     }
 

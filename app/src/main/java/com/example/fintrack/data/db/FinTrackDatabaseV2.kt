@@ -48,6 +48,11 @@ import androidx.room.RoomDatabase
  *       175), audit_log (P24 retention-bounded sensitive-action log) and
  *       app_lock_state (singleton; secret lives in Keystore, not Room).
  *       Additive only; existing v10 rows are unchanged.
+ *  v12 — Stage 13 (A + D): payee_category_rules (per-payee persistent
+ *       category rules), transaction_evidence (durable transaction ->
+ *       source SMS + raw LLM JSON link) and llm_interpretations.rawLlmJson
+ *       (raw LLM output for audit). Additive only; raw SMS bodies stay in
+ *       raw_sms.
  */
 @Database(
     entities = [
@@ -109,8 +114,10 @@ import androidx.room.RoomDatabase
         com.example.fintrack.data.db.SettingsProfileEntity::class,
         com.example.fintrack.data.db.AuditLogEntryEntity::class,
         com.example.fintrack.data.db.AppLockStateEntity::class,
+        com.example.fintrack.data.db.PayeeCategoryRuleEntity::class,
+        com.example.fintrack.data.db.TransactionEvidenceEntity::class,
     ],
-    version = 11,
+    version = 12,
     exportSchema = true,
 )
 abstract class FinTrackDatabaseV2 : RoomDatabase() {
@@ -127,12 +134,15 @@ abstract class FinTrackDatabaseV2 : RoomDatabase() {
     /** Stage 11 (P23 + P24): backup staging/commit, profiles, audit, app lock. */
     abstract fun financeDaoV9(): FinanceDaoV9
 
+    /** Stage 13 (A + D): payee category rules + transaction evidence. */
+    abstract fun financeDaoV10(): FinanceDaoV10
+
     abstract fun smsDao(): SmsDao
     abstract fun llmDao(): LlmDao
 
     val llmSchedulerDao: LlmSchedulerDao get() = llmDao()
 
     companion object {
-        const val SCHEMA_VERSION = 11
+        const val SCHEMA_VERSION = 12
     }
 }

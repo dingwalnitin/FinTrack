@@ -142,7 +142,7 @@ class PromptBuilderV2Test {
     @Test
     fun `cache key is sensitive to promptVersion`() {
         val a = request("Rs.250.00 debited")
-        val b = request("Rs.250.00 debited").copy(promptVersion = "enrich-prompt-v3")
+        val b = request("Rs.250.00 debited").copy(promptVersion = "enrich-prompt-v4")
         assertTrue(
             PromptBuilder.cacheKey(a, "p", "m") !=
                 PromptBuilder.cacheKey(b, "p", "m"),

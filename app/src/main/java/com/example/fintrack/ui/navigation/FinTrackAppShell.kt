@@ -74,6 +74,7 @@ fun FinTrackAppShell(
     llmSettingsViewModel: com.example.fintrack.ui.settings.LlmSettingsViewModel? = null,
     manualEntryViewModel: com.example.fintrack.application.transactions.ManualEntryViewModel? = null,
     transactionDetailViewModel: com.example.fintrack.application.transactions.TransactionDetailViewModel? = null,
+    smsReviewViewModel: com.example.fintrack.application.review.SmsReviewViewModel? = null,
 ) {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
@@ -234,6 +235,14 @@ fun FinTrackAppShell(
                     PlaceholderScreen(stringResource(R.string.nav_review))
                 }
             }
+            composable(Routes.SMS_REVIEW) {
+                val svm = smsReviewViewModel
+                if (svm != null) {
+                    com.example.fintrack.ui.review.SmsReviewScreen(svm)
+                } else {
+                    PlaceholderScreen("SMS review")
+                }
+            }
             composable(Routes.SETTINGS) {
                 val store = llmConfigStore
                 val initialModel = if (store != null) {
@@ -248,6 +257,7 @@ fun FinTrackAppShell(
                     },
                     onNavigateToDiagnostics = { navController.navigate(Routes.DIAGNOSTICS) },
                     onNavigateToSmsConsent = { navController.navigate(Routes.SMS_CONSENT) },
+                    onNavigateToSmsReview = { navController.navigate(Routes.SMS_REVIEW) },
                     onNavigateToLlmSettings = { navController.navigate(Routes.LLM_SETTINGS) },
                     onRequestSmsPermission = onRequestSmsPermission,
                     llmProcessingViewModel = llmProcessingViewModel,

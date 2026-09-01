@@ -217,5 +217,32 @@ abstract class LlmDao : LlmSchedulerDao {
            ORDER BY updatedAtEpochMs DESC LIMIT :limit"""
     )
     abstract suspend fun recentFailureSamples(limit: Int): List<LlmJobEntity>
+
+    // ---- Stage 13 (F): SMS review reads + re-run ----
+
+    /** Latest job for a source message (SMS review status). */
+    @Query("SELECT * FROM llm_jobs WHERE sourceMessageId = :sourceMessageId ORDER BY createdAtEpochMs DESC LIMIT 1")
+    abstract suspend fun jobForMessage(sourceMessageId: String): LlmJobEntity?
+
+    /** Reset a message's terminal/retryable job back to PENDING so it can be re-run (single-job re-run). */
+    @Query(
+        """UPDATE llm_jobs SET status = 'PENDING', attempts = 0, nextRetryAtEpochMs = :nowEpochMs,
+           claimedAtEpochMs = NULL, claimedByWorker = NULL, lastErrorClass = NULL,
+           updatedAtEpochMs = :nowEpochMs
+           WHERE sourceMessageId = :sourceMessageId AND status IN ('TERMINAL_FAILED','RETRYABLE_FAILED')"""
+    )
+    abstract suspend fun resetJobToPending(sourceMessageId: String, nowEpochMs: Long): Int
+
+    /** Aggregate counts of jobs per status (review-list summary). */
+    @Query(
+        """SELECT status, COUNT(*) AS count FROM llm_jobs GROUP BY status"""
+    )
+    abstract suspend fun jobStatusCounts(): List<JobStatusCountRow>
+
+    @Query("SELECT * FROM llm_jobs WHERE status = :status ORDER BY createdAtEpochMs DESC LIMIT :limit")
+    abstract suspend fun jobsInStatus(status: String, limit: Int): List<LlmJobEntity>
 }
+
+/** Aggregate count of llm_jobs per status (SMS review summary). */
+data class JobStatusCountRow(val status: String, val count: Long)
 

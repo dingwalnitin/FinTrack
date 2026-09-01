@@ -29,6 +29,8 @@ object LlmResponseDecoder {
         val knownRails: Set<String> = emptySet(),
         /** Earliest plausible event time (message received time). */
         val receivedAtEpochMs: Long = Long.MAX_VALUE,
+        /** Stage 13 (C): account-type hints present in the message (e.g. "card", "savings a/c", "current"). */
+        val knownAccountTypeHints: Set<Interpretation.AccountType> = emptySet(),
     )
 
     sealed interface ValidationResult {
@@ -50,6 +52,7 @@ object LlmResponseDecoder {
         "counterpartyRaw", "counterpartyNormalized", "categorySuggestion",
         "transferTargetToken", "recurring", "emiDetail", "occurredAtEpochMs",
         "confidence", "overallConfidence",
+        "accountType",                     // Stage 13 (C)
     )
 
     fun decode(rawJson: String, bounds: EvidenceBounds): ValidationResult {
@@ -151,6 +154,20 @@ object LlmResponseDecoder {
 
         val emiDetail = optString(root, "emiDetail")
 
+        // ---- Stage 13 (C): account type ----
+        val accountType = optString(root, "accountType")?.let { raw ->
+            try {
+                Interpretation.AccountType.valueOf(raw.uppercase())
+            } catch (e: IllegalArgumentException) {
+                return ValidationResult.Invalid(LlmErrorClass.SCHEMA_VALIDATION_FAILED, "unknown accountType '$raw'")
+            }
+        }
+        if (accountType != null && bounds.knownAccountTypeHints.isNotEmpty() &&
+            accountType !in bounds.knownAccountTypeHints && accountType != Interpretation.AccountType.UNKNOWN
+        ) {
+            return ValidationResult.Invalid(LlmErrorClass.HALLUCINATION_REJECTED, "accountType ${accountType.name} not in evidence")
+        }
+
         // ---- confidence block ----
         val conf = root.optJSONObject("confidence")
         fun fieldConf(key: String): FieldConfidence? {
@@ -187,6 +204,7 @@ object LlmResponseDecoder {
                 confidenceTransferTarget = fieldConf("transferTarget"),
                 confidenceRecurring = fieldConf("recurring"),
                 confidenceEmi = fieldConf("emi"),
+                accountType = accountType,
             )
         } catch (e: SchemaException) {
             return ValidationResult.Invalid(LlmErrorClass.SCHEMA_VALIDATION_FAILED, e.message ?: "schema error")

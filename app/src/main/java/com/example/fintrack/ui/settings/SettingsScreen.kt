@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.Sms
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.automirrored.filled.FactCheck
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -71,6 +72,7 @@ fun SettingsScreen(
     onChanged: (SettingsUiModel) -> Unit = {},
     onNavigateToDiagnostics: () -> Unit = {},
     onNavigateToSmsConsent: () -> Unit = {},
+    onNavigateToSmsReview: () -> Unit = {},
     onNavigateToLlmSettings: () -> Unit = {},
     onRequestSmsPermission: () -> Unit = {},
     llmProcessingViewModel: LlmProcessingViewModel? = null,
@@ -105,6 +107,7 @@ fun SettingsScreen(
                 CommonSectionHeader(stringResource(R.string.settings_accounts_sources))
                 SettingsLink(stringResource(R.string.nav_accounts), icon = Icons.Filled.AccountBalanceWallet)
                 SettingsLink("Scan SMS messages", icon = Icons.Filled.Sms, onClick = onNavigateToSmsConsent)
+                SettingsLink("SMS review", icon = Icons.AutoMirrored.Filled.FactCheck, onClick = onNavigateToSmsReview)
             }
         }
 

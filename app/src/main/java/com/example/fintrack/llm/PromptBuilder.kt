@@ -48,6 +48,7 @@ object PromptBuilder {
         appendLine("  \"categorySuggestion\": string | null, // e.g. \"Groceries\", \"Utilities\", \"Dining\"")
         appendLine("  \"transferTargetToken\": string | null,")
         appendLine("  \"recurring\": boolean | null,       // true only if explicitly stated as recurring/mandate/autopay")
+        appendLine("  \"accountType\": \"SAVINGS\" | \"CURRENT\" | \"CREDIT_CARD\" | \"LOAN\" | \"OVERDRAFT\" | \"PREPAID\" | \"UNKNOWN\" | null, // Stage 13 (C): only when the SMS explicitly states a card / savings / current account")
         appendLine("  \"emiDetail\": string | null,")
         appendLine("  \"occurredAtEpochMs\": integer | null,")
         appendLine("  \"confidence\": { \"<field>\": { \"value\": 0.0..1.0, \"explanation\": \"string\" } },")

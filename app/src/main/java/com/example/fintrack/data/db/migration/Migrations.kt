@@ -343,5 +343,6 @@ object Migrations {
         com.example.fintrack.data.db.migration.MIGRATION_8_9,
         com.example.fintrack.data.db.migration.MIGRATION_9_10,
         com.example.fintrack.data.db.migration.MIGRATION_10_11,
+        com.example.fintrack.data.db.migration.MIGRATION_11_12,
     )
 }

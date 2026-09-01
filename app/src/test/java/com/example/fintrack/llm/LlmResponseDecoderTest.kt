@@ -215,4 +215,54 @@ class LlmResponseDecoderTest {
         // Low confidence surfaces partial ambiguity rather than one opaque score.
         assertTrue(i.confidenceAmount!!.value < 0.5)
     }
+
+    // ---- Stage 13 (C): account type ----
+
+    private fun boundsWithAccountTypes(hints: Set<Interpretation.AccountType>) =
+        LlmResponseDecoder.EvidenceBounds(
+            knownAmountsMinor = setOf(25_000L),
+            knownAccountTokens = setOf("XX1234"),
+            knownRails = emptySet(),
+            knownCounterparties = setOf("Swiggy"),
+            receivedAtEpochMs = 1_700_000_000_000L,
+            knownAccountTypeHints = hints,
+        )
+
+    @Test
+    fun `valid json decodes accountType when in evidence`() {
+        val json = """{"amountMinor":25000,"currencyCode":"INR","direction":"DEBIT",
+                       "accountToken":"XX1234","counterpartyRaw":"Swiggy",
+                       "accountType":"CREDIT_CARD",
+                       "confidence":{"account":{"value":0.9,"explanation":"card stated"}}}"""
+        val r = LlmResponseDecoder.decode(json, boundsWithAccountTypes(setOf(Interpretation.AccountType.CREDIT_CARD)))
+        assertTrue(r is LlmResponseDecoder.ValidationResult.Valid)
+        val i = (r as LlmResponseDecoder.ValidationResult.Valid).response.interpretation
+        assertEquals(Interpretation.AccountType.CREDIT_CARD, i.accountType)
+    }
+
+    @Test
+    fun `accountType absent stays null`() {
+        val r = LlmResponseDecoder.decode(validJson, bounds())
+        assertTrue(r is LlmResponseDecoder.ValidationResult.Valid)
+        val i = (r as LlmResponseDecoder.ValidationResult.Valid).response.interpretation
+        assertNull(i.accountType)
+    }
+
+    @Test
+    fun `unknown accountType is schema failure`() {
+        val json = """{"amountMinor":25000,"currencyCode":"INR","direction":"DEBIT","accountType":"SAFE_DEPOSIT"}"""
+        val r = LlmResponseDecoder.decode(json, boundsWithAccountTypes(emptySet()))
+        assertTrue(r is LlmResponseDecoder.ValidationResult.Invalid)
+        assertEquals(LlmErrorClass.SCHEMA_VALIDATION_FAILED, (r as LlmResponseDecoder.ValidationResult.Invalid).errorClass)
+    }
+
+    @Test
+    fun `accountType not in evidence is hallucination rejected`() {
+        val json = """{"amountMinor":25000,"currencyCode":"INR","direction":"DEBIT",
+                       "accountToken":"XX1234","accountType":"SAVINGS"}"""
+        // Evidence only hints CREDIT_CARD, model claims SAVINGS -> reject.
+        val r = LlmResponseDecoder.decode(json, boundsWithAccountTypes(setOf(Interpretation.AccountType.CREDIT_CARD)))
+        assertTrue(r is LlmResponseDecoder.ValidationResult.Invalid)
+        assertEquals(LlmErrorClass.HALLUCINATION_REJECTED, (r as LlmResponseDecoder.ValidationResult.Invalid).errorClass)
+    }
 }

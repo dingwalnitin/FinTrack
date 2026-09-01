@@ -27,6 +27,9 @@ object Routes {
     const val SETTINGS = "settings"
     const val SMS_CONSENT = "sms-consent"
 
+    /** Stage 13 (F) — SMS ingestion review (passed/failed/pending + re-run). */
+    const val SMS_REVIEW = "sms-review"
+
     /** Dedicated LLM (AI interpretation) settings — own screen, not inline. */
     const val LLM_SETTINGS = "settings/llm"
 

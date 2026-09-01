@@ -42,6 +42,11 @@ fun TransactionEntity.toDomain(): Transaction = Transaction(
     // Sign is encoded in the semantic kind (amountMinor is always absolute);
     // EXPENSE/FEE/TRANSFER/CASH_MOVE are outflows (debit).
     directionDebit = kind == "EXPENSE" || kind == "FEE" || kind == "TRANSFER" || kind == "CASH_MOVE",
+    // Stage 13 (B): richer filter fields
+    kind = kind,
+    categoryId = categoryId,
+    accountId = accountId,
+    rail = rail,
 )
 
 private typealias Instant = java.time.Instant

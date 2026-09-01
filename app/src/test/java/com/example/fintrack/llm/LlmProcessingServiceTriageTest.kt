@@ -5,6 +5,7 @@ import com.example.fintrack.data.db.LlmDao
 import com.example.fintrack.data.db.LlmInterpretationEntity
 import com.example.fintrack.data.db.LlmJobEntity
 import com.example.fintrack.data.db.LlmJobStates
+import com.example.fintrack.data.db.JobStatusCountRow
 import com.example.fintrack.data.db.LlmMetricEntity
 import com.example.fintrack.data.db.LlmResponseCacheEntity
 import com.example.fintrack.data.db.LlmUsageCounterEntity
@@ -103,6 +104,12 @@ class LlmProcessingServiceTriageTest {
         override suspend fun expiredLeases(now: Long, leaseMs: Long): Long = 0
         override suspend fun cacheEntryCount(): Long = 0
         override suspend fun recentFailureSamples(limit: Int) = emptyList<LlmJobEntity>()
+
+        // ---- Stage 13 (F): SMS review reads ----
+        override suspend fun jobForMessage(sourceMessageId: String): LlmJobEntity? = null
+        override suspend fun resetJobToPending(sourceMessageId: String, nowEpochMs: Long): Int = 0
+        override suspend fun jobStatusCounts(): List<JobStatusCountRow> = emptyList()
+        override suspend fun jobsInStatus(status: String, limit: Int): List<LlmJobEntity> = emptyList()
     }
 
     /** In-memory [SmsDao] fake — only [allRawRows] is exercised by the service. */

@@ -215,6 +215,7 @@ class EnrichmentOrchestrator(
                     tokensCompletion = estimateTokens(raw),
                     fromCache = false,
                     createdAtEpochMs = System.currentTimeMillis(),
+                    rawLlmJson = raw,       // Stage 13 (D): raw LLM output JSON
                 )
                 jobStore.storeInterpretation(entity)
                 jobStore.putCacheEntry(
@@ -300,6 +301,7 @@ class EnrichmentOrchestrator(
                     tokensCompletion = 0,
                     fromCache = true,
                     createdAtEpochMs = now,
+                    rawLlmJson = validatedJson,   // Stage 13 (D): store raw JSON even on cache-hit
                 )
             )
         }
@@ -331,12 +333,22 @@ class EnrichmentOrchestrator(
             if ("card" in text.lowercase()) setOf("CARD_POS", "CARD_ONLINE") else emptySet()
         val counterparties = Regex("(?:to|from)\\s+([A-Z][A-Za-z&. ]{2,40})").findAll(text)
             .map { it.groupValues[1].trim() }.toSet()
+        val accountTypeHints = buildSet {
+            val lower = text.lowercase()
+            if ("savings" in lower || "saving a/c" in lower || "savings account" in lower) add(Interpretation.AccountType.SAVINGS)
+            if ("current" in lower || "current a/c" in lower || "current account" in lower) add(Interpretation.AccountType.CURRENT)
+            if ("credit card" in lower || "card" in lower) add(Interpretation.AccountType.CREDIT_CARD)
+            if ("loan" in lower || "loan a/c" in lower) add(Interpretation.AccountType.LOAN)
+            if ("overdraft" in lower || "od" in lower) add(Interpretation.AccountType.OVERDRAFT)
+            if ("prepaid" in lower || "prepaid card" in lower) add(Interpretation.AccountType.PREPAID)
+        }
         return LlmResponseDecoder.EvidenceBounds(
             knownAmountsMinor = amounts,
             knownAccountTokens = accountTokens,
             knownRails = rails,
             knownCounterparties = counterparties,
             receivedAtEpochMs = request.receivedAtEpochMs,
+            knownAccountTypeHints = accountTypeHints,
         )
     }
 

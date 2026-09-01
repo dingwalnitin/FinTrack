@@ -320,4 +320,21 @@ class FinTrackApplication : Application() {
     val transferCandidateMatcher: com.example.fintrack.domain.service.TransferCandidateMatcher by lazy {
         com.example.fintrack.domain.service.TransferCandidateMatcher(transferCandidateSource)
     }
+
+    // ---- Stage 13 (A + D) ----
+
+    /** Payee category rules + transaction evidence repository (v12). */
+    val payeeEvidenceRepository: com.example.fintrack.data.repository.RoomPayeeEvidenceRepository by lazy {
+        com.example.fintrack.data.repository.RoomPayeeEvidenceRepository(database)
+    }
+    val payeeRuleResolver: com.example.fintrack.domain.service.PayeeRuleResolver by lazy {
+        com.example.fintrack.domain.service.PayeeRuleResolver(emptyMap())
+    }
+
+    /** Stage 13 (F): SMS review — manual overrides via the write path. */
+    val smsReviewService: com.example.fintrack.domain.service.SmsReviewService by lazy {
+        com.example.fintrack.domain.service.SmsReviewService(
+            writeService = transactionWriteService,
+        )
+    }
 }

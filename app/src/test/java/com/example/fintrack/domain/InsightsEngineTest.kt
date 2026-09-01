@@ -324,4 +324,76 @@ class InsightsEngineTest {
         assertEquals(200L, day5.inflowMinor)
         assertEquals(100L, day5.outflowMinor)
     }
+
+    // ---- Stage 13 (E): regression guards for the §2 class of bug ----
+    // The income/expense sign must ALWAYS come from directionDebit (semantic
+    // kind), never from the sign of amountMinor (which is always absolute).
+
+    @Test
+    fun `regression_incomeNeverCountedAsExpenseEvenWithSignAmbiguity`() {
+        // amountMinor is positive for BOTH rows; only directionDebit differs.
+        // If the engine ever keyed off amount sign, the income would be miscounted.
+        val txns = listOf(
+            txn("in", "INCOME", debit = false, amount = 500_000L, 10),
+            txn("out", "EXPENSE", debit = true, amount = 200_000L, 11),
+        )
+        val cf = engine.cashFlow(txns, 1, 30, "INR")
+        assertEquals(500_000L, cf.inflowExternalMinor)
+        assertEquals(200_000L, cf.outflowExternalMinor)
+        assertEquals(300_000L, cf.netExternalMinor)
+    }
+
+    @Test
+    fun `regression_incomeSourcesOnlyCountsCredits`() {
+        val txns = listOf(
+            txn("sal", "INCOME", debit = false, amount = 900_000L, 5, merchant = "Employer"),
+            txn("spend", "EXPENSE", debit = true, amount = 900_000L, 6, merchant = "Employer"),
+        )
+        val inc = engine.incomeSources(txns, 1, 30, "INR")
+        // Only the credit contributes; the expense with the same counterparty must not inflate income.
+        assertEquals(900_000L, inc.totalNetMinor)
+        assertEquals(1, inc.rows.size)
+    }
+
+    @Test
+    fun `regression_savingsRateIgnoresRefundsAsIncome`() {
+        val txns = listOf(
+            txn("sal", "INCOME", debit = false, amount = 1_000_000L, 5),
+            txn("spend", "EXPENSE", debit = true, amount = 300_000L, 6),
+            txn("refund", "REFUND", debit = false, amount = 50_000L, 7),
+        )
+        val sr = engine.savingsRate(txns, 1, 30)
+        assertEquals(1_000_000L, sr.incomeMinor)     // refund is NOT income
+        assertEquals(300_000L, sr.expensesMinor)
+        assertEquals(0.7, sr.rate!!, 1e-9)
+    }
+
+    @Test
+    fun `regression_perAccountBalanceUsesDirectionNotSign`() {
+        val postings = listOf(
+            txn("spend", "EXPENSE", debit = true, amount = 40_000L, 5),   // money OUT
+            txn("salary", "INCOME", debit = false, amount = 40_000L, 6),   // money IN
+        )
+        // Opening + out + in => balance returns to opening (net 0 movement).
+        val h = engine.balanceHistory("acc1", 100_000L, postings, emptyList(), "INR")
+        val lastDerived = h.points.last { it.source == InsightsEngine.BalancePoint.Source.LEDGER_DERIVED }
+        assertEquals(100_000L, lastDerived.derivedMinor)
+    }
+
+    @Test
+    fun `regression_emptyLedgerDoesNotCrashAnyAggregate`() {
+        val empty = emptyList<LedgerTxnView>()
+        val cf = engine.cashFlow(empty, 1, 30, "INR")
+        assertEquals(0L, cf.netExternalMinor)
+        val bd = engine.spendBreakdown(empty, 1, 30, InsightsEngine.Grouping.CATEGORY, currencyCode = "INR")
+        assertEquals(0L, bd.totalNetMinor)
+        assertTrue(bd.rows.isEmpty())
+        val sr = engine.savingsRate(empty, 1, 30)
+        assertTrue(sr.zeroIncome)
+        assertNull(sr.rate)
+        val cal = engine.cashFlowCalendar(empty, 1, 30)
+        assertTrue(cal.isEmpty())
+        val p = engine.pareto(bd)
+        assertEquals(0, p.vitalFewCount)
+    }
 }

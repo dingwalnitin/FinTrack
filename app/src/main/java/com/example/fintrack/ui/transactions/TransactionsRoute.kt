@@ -2,6 +2,7 @@ package com.example.fintrack.ui.transactions
 
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -14,6 +15,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -26,9 +28,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.fintrack.domain.model.Transaction
+import com.example.fintrack.domain.service.TransactionFilter
 import com.example.fintrack.ui.common.BrandFilterChip
 import com.example.fintrack.ui.common.EmptyState
 import com.example.fintrack.ui.common.ErrorState
+import com.example.fintrack.ui.common.FinTrackCard
 import com.example.fintrack.ui.common.LoadingSkeleton
 import com.example.fintrack.ui.common.MoneyRow
 import com.example.fintrack.ui.common.MoneyRowData
@@ -43,7 +47,10 @@ private enum class TxnFilter { ALL, INCOME, EXPENSE }
 
 /**
  * Transactions route: dense list rendering every common UI state, with a
- * lightweight client-side search + income/expense filter grouped by day.
+ * client-side search + income/expense filter grouped by day. Stage 13 (B)
+ * adds sort controls (date/amount/merchant, asc/desc) and a filter panel
+ * (rail, min/max amount). The INCOME/EXPENSE axis always derives from
+ * [Transaction.directionDebit] — never from the sign of `amountMinor`.
  */
 @Composable
 fun TransactionsRoute(
@@ -63,19 +70,36 @@ fun TransactionsRoute(
 private fun TransactionsList(all: List<Transaction>, onOpenTransaction: (String) -> Unit) {
     var query by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf(TxnFilter.ALL) }
+    var showFilters by remember { mutableStateOf(false) }
+    var selectedRail by remember { mutableStateOf<String?>(null) }
+    var minAmountText by remember { mutableStateOf("") }
+    var maxAmountText by remember { mutableStateOf("") }
+    var sortField by remember { mutableStateOf(TransactionFilter.SortField.DATE) }
+    var sortAsc by remember { mutableStateOf(false) }
     val zone = remember { ZoneId.systemDefault() }
 
-    val filtered = remember(all, query, filter) {
-        all.filter { txn ->
-            val matchesQuery = query.isBlank() ||
-                (txn.counterparty?.contains(query, ignoreCase = true) == true)
-            val matchesFilter = when (filter) {
-                TxnFilter.ALL -> true
-                TxnFilter.INCOME -> !txn.directionDebit
-                TxnFilter.EXPENSE -> txn.directionDebit
-            }
-            matchesQuery && matchesFilter
-        }.sortedByDescending { it.occurredAt }
+    val availableRails = remember(all) {
+        all.mapNotNull { it.rail }.filter { it.isNotBlank() }.distinct().sorted()
+    }
+
+    val filters = TransactionFilter.Filters(
+        kind = when (filter) {
+            TxnFilter.ALL -> TransactionFilter.KindFilter.ALL
+            TxnFilter.INCOME -> TransactionFilter.KindFilter.INCOME
+            TxnFilter.EXPENSE -> TransactionFilter.KindFilter.EXPENSE
+        },
+        query = query,
+        rail = selectedRail,
+        minAmountMinor = minAmountText.toLongOrNull(),
+        maxAmountMinor = maxAmountText.toLongOrNull(),
+    )
+    val sort = TransactionFilter.SortSpec(
+        field = sortField,
+        order = if (sortAsc) TransactionFilter.SortOrder.ASC else TransactionFilter.SortOrder.DESC,
+    )
+
+    val filtered = remember(all, filters, sort) {
+        TransactionFilter.apply(all, filters, sort)
     }
     val grouped = remember(filtered) { filtered.groupBy { it.occurredAt.atZone(zone).toLocalDate() } }
     val today = remember(zone) { LocalDate.now(zone) }
@@ -87,7 +111,7 @@ private fun TransactionsList(all: List<Transaction>, onOpenTransaction: (String)
         item {
             Text("Transactions", style = MaterialTheme.typography.headlineSmall)
             Text(
-                "${all.size} total",
+                "${all.size} total · ${filtered.size} shown",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -117,8 +141,94 @@ private fun TransactionsList(all: List<Transaction>, onOpenTransaction: (String)
                         label = label,
                     )
                 }
+                BrandFilterChip(
+                    selected = showFilters,
+                    onClick = { showFilters = !showFilters },
+                    label = "Filters",
+                )
             }
         }
+
+        // ---- Stage 13 (B): sort + advanced filter panel ----
+        if (showFilters) {
+            item {
+                FinTrackCard {
+                    Text("Sort by", style = MaterialTheme.typography.titleSmall)
+                    Spacer(Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        listOf(
+                            TransactionFilter.SortField.DATE to "Date",
+                            TransactionFilter.SortField.AMOUNT to "Amount",
+                            TransactionFilter.SortField.MERCHANT to "Merchant A-Z",
+                        ).forEach { (field, label) ->
+                            FilterChip(
+                                selected = sortField == field,
+                                onClick = { sortField = field },
+                                label = { Text(label) },
+                            )
+                        }
+                        FilterChip(
+                            selected = sortAsc,
+                            onClick = { sortAsc = !sortAsc },
+                            label = { Text(if (sortAsc) "Asc" else "Desc") },
+                        )
+                    }
+
+                    Spacer(Modifier.height(12.dp))
+                    Text("Min amount (₹)", style = MaterialTheme.typography.titleSmall)
+                    OutlinedTextField(
+                        value = minAmountText,
+                        onValueChange = { minAmountText = it.filter { c -> c.isDigit() } },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("e.g. 500") },
+                        singleLine = true,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text("Max amount (₹)", style = MaterialTheme.typography.titleSmall)
+                    OutlinedTextField(
+                        value = maxAmountText,
+                        onValueChange = { maxAmountText = it.filter { c -> c.isDigit() } },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("e.g. 10000") },
+                        singleLine = true,
+                    )
+
+                    if (availableRails.isNotEmpty()) {
+                        Spacer(Modifier.height(12.dp))
+                        Text("Rail", style = MaterialTheme.typography.titleSmall)
+                        Spacer(Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            BrandFilterChip(
+                                selected = selectedRail == null,
+                                onClick = { selectedRail = null },
+                                label = "All rails",
+                            )
+                            availableRails.forEach { rail ->
+                                BrandFilterChip(
+                                    selected = selectedRail == rail,
+                                    onClick = { selectedRail = if (selectedRail == rail) null else rail },
+                                    label = rail,
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Direction always uses the semantic kind, never the amount sign.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+
         if (filtered.isEmpty()) {
             item {
                 Text(

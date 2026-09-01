@@ -105,6 +105,8 @@ data class LlmInterpretationEntity(
     val tokensCompletion: Int,
     val fromCache: Boolean,
     val createdAtEpochMs: Long,
+    /** Stage 13 (D): raw LLM output JSON for audit/debug. Null for rows predating v12. Never overwritten by cache-hit. */
+    val rawLlmJson: String? = null,
 )
 
 @Entity(

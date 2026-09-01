@@ -12,7 +12,7 @@ package com.example.fintrack.llm
  *    prompt evolves (P08 migration path).
  */
 
-const val PROMPT_VERSION = "enrich-prompt-v2"
+const val PROMPT_VERSION = "enrich-prompt-v3"
 const val SCHEMA_VERSION = "enrich-schema-v1"
 
 /** Minimal normalized evidence handed to the model. Never raw truth. */
@@ -74,10 +74,15 @@ data class Interpretation(
     val confidenceTransferTarget: FieldConfidence?,
     val confidenceRecurring: FieldConfidence?,
     val confidenceEmi: FieldConfidence?,
+    /** Stage 13 (C): account type hint from LLM (SAVINGS, CURRENT, CREDIT_CARD, etc.). Only accepted when the SMS explicitly references a card/savings/current account. */
+    val accountType: AccountType? = null,
 ) {
     enum class Direction { DEBIT, CREDIT }
 
     enum class Rail { UPI, IMPS, NEFT, RTGS, CARD_POS, CARD_ONLINE, ATM, ACH, UNKNOWN }
+
+    /** Stage 13 (C): account types the model may suggest. */
+    enum class AccountType { SAVINGS, CURRENT, CREDIT_CARD, LOAN, OVERDRAFT, PREPAID, UNKNOWN }
 }
 
 /** Successful, fully-validated model output plus usage metadata. */

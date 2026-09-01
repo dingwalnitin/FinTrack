@@ -9,6 +9,7 @@ import com.example.fintrack.data.db.LlmJobStates
 import com.example.fintrack.data.db.LlmMetricEntity
 import com.example.fintrack.data.db.LlmResponseCacheEntity
 import com.example.fintrack.data.db.LlmUsageCounterEntity
+import com.example.fintrack.data.db.JobStatusCountRow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
@@ -208,6 +209,17 @@ class EnrichmentOrchestratorTest {
             jobs.values.filter {
                 it.status in listOf(LlmJobStates.TERMINAL_FAILED, LlmJobStates.RETRYABLE_FAILED)
             }.sortedByDescending { it.updatedAtEpochMs }.take(limit)
+
+        // ---- Stage 13 (F): SMS review reads ----
+        override suspend fun jobForMessage(sourceMessageId: String): LlmJobEntity? =
+            jobs.values.firstOrNull { it.sourceMessageId == sourceMessageId }
+
+        override suspend fun resetJobToPending(sourceMessageId: String, nowEpochMs: Long): Int = 0
+
+        override suspend fun jobStatusCounts(): List<JobStatusCountRow> = emptyList()
+
+        override suspend fun jobsInStatus(status: String, limit: Int): List<LlmJobEntity> =
+            jobs.values.filter { it.status == status }.sortedByDescending { it.createdAtEpochMs }.take(limit)
 
         private companion object {
             val TERMINAL_STATUSES = setOf(LlmJobStates.SUCCEEDED, LlmJobStates.TERMINAL_FAILED)
